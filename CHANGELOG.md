@@ -1,4 +1,27 @@
 # Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [2022.12.14-r222] - 2026-11-12
+
+### Added
+- GitHub Actions CI/CD workflow (`.github/workflows/docker-build.yml`) for automated multi-architecture Docker image builds (`linux/amd64`, `linux/arm64`, `linux/arm/v7`) publishing to GitHub Packages (`ghcr.io/tony-vs-code/deemix-docker`).
+
+### Changed
+- Migrated project repository and pipelines from GitLab to GitHub (`tony-vs-code/deemix-docker`).
+- Transitioned Docker build process to a self-contained multi-stage build directly within `Dockerfile`, eliminating external pre-built architecture dependencies and reducing maintenance overhead.
+- Recovered and formalized corrupted `version` string (`2022.12.14-r222.5d447b6035`).
+
+### Security
+- Neutralized unsafe and vulnerable update checks to prevent upstream telemetry or version querying against external endpoints.
+- Removed references and dependencies associated with the hijacked `deemix.app` domain.
+
+### Compatibility
+- Reaffirmed 100% preservation of all legacy environment variables, container ports, and volume mount contracts.
+
 ## 2022-03-10
 - Completely reworked image. The gitlab CI will now build all architectures and store them as packages in the repo. Those will be pulled during build. This lowers the image footprint to 37mb, down from 150.
 - Re-added previous "serverwide-arl" functionality as "DEEMIX_SINGLE_USER". The readme shows how to use it.
