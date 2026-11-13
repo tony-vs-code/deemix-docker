@@ -5,8 +5,6 @@
 FROM --platform=$BUILDPLATFORM node:18-bookworm-slim AS builder
 
 ARG TARGETARCH=amd64
-ARG DEEMIX_REPO=https://gitlab.com/RemixDev/deemix-gui.git
-ARG DEEMIX_COMMIT=5d447b6035d9771757db9340da87a0375606971f
 ARG STATIC_URL
 
 WORKDIR /build
@@ -22,19 +20,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+COPY src/ /build/src/
+
 # If STATIC_URL is provided, download prebuilt binary; otherwise build from source
 RUN if [ -n "$STATIC_URL" ]; then \
         echo "Fetching prebuilt deemix-server from ${STATIC_URL}..." && \
         curl -fsSL "${STATIC_URL}/deemix-server-linux-${TARGETARCH}" -o /deemix-server; \
     else \
-        echo "Building deemix-server from source (pinned commit ${DEEMIX_COMMIT})..." && \
-        git clone --recursive "${DEEMIX_REPO}" src && \
-        cd src && \
-        git reset --hard --recurse-submodules "${DEEMIX_COMMIT}" && \
-        # Neutralize hijacked domain (deemix.app) update check & links \
-        sed -i 's|https://deemix.app/gui/latest|http://127.0.0.1/disabled|g' server/src/app.ts && \
-        sed -i 's|https://deemix.app|https://github.com/tony-vs-code/deemix-docker|g' webui/src/components/pages/About.vue || true && \
-        sed -i 's|https://tg.deemix.app|https://t.me/RemixDevNews|g' webui/src/components/pages/About.vue || true && \
+        echo "Building deemix-server from local source..." && \
+        cd /build/src && \
         # Configure pkg target based on TARGETARCH \
         case "${TARGETARCH}" in \
             "amd64") PKG_TARGET="node16-linuxstatic-x64"; BIN_PATH="dist/deemix-server-x64" ;; \
