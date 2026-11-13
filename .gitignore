@@ -1,0 +1,10 @@
+# Agent directories and workspaces
+agents/
+.agents/
+
+# Local configuration and runtime data
+config/
+downloads/
+*.log
+.env
+.cache/

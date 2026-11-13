@@ -17,7 +17,7 @@ $ docker run -d --name Deemix \
 				-e UMASK_SET=022 \
 				-e DEEMIX_SINGLE_USER=true \
 				-p 6595:6595 \
-				registry.gitlab.com/bockiii/deemix-docker
+				ghcr.io/tony-vs-code/deemix-docker:latest
 ```
 
 ### Example for Docker Compose:
@@ -25,7 +25,7 @@ $ docker run -d --name Deemix \
 version: '3.3'
 services:
 	deemix:
-		image: registry.gitlab.com/bockiii/deemix-docker
+		image: ghcr.io/tony-vs-code/deemix-docker:latest
 		container_name: Deemix
 		volumes:
 			- /your/storage/path/:/downloads
@@ -57,7 +57,7 @@ Pull the latest container for the latest Deemix version
 | `-p 6595:6595` | Port opened for the web interface |
 | `-e INTPORT=3333` | EXTRA OPTIONAL: This changes the internal port of deemix. DON'T CHANGE THIS IF YOU DONT KNOW WHY YOU WOULD DO IT |
 | `-e DISABLE_OWNERSHIP_CHECK=true` | EXTRA OPTIONAL: This disables the ownership check on the downloads folder. Can lead to download issues if the folder is not owned by the correct user. DON'T USE THIS IF YOU DONT KNOW WHY YOU WOULD NEED IT |
-| `registry.gitlab.com/bockiii/deemix-docker` | This container |
+| `ghcr.io/tony-vs-code/deemix-docker` | This container |
 
 To access the web interface, go to http://YOURSERVERIP:6595 
 
@@ -81,9 +81,9 @@ See CHANGELOG.md
 
 I am in no way affiliated with the Deemix project (or any other Deezloader-like project for that matter).
 
-Gitlab link for this container: https://gitlab.com/Bockiii/deemix-docker
+GitHub repository for this container: https://github.com/tony-vs-code/deemix-docker
 
-Issue Tracker for this Docker: https://gitlab.com/Bockiii/deemix-docker/-/issues
+Issue Tracker for this Docker: https://github.com/tony-vs-code/deemix-docker/issues
 
 You can donate/buy me a coffe on Ko-Fi: https://ko-fi.com/bocki
 
