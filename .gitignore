@@ -3,8 +3,8 @@ agents/
 .agents/
 
 # Local configuration and runtime data
-config/
-downloads/
+/config/
+/downloads/
 *.log
 .env
 .cache/
