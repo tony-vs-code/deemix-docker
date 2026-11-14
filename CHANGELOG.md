@@ -5,14 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2026.11.14] - 2026-11-14
 
 ### Added
-- **Dedicated Downloads & Status Page**: Full-screen view for downloads, active/completed/failed status tracking, live progress, and Clear Completed button.
-- **Local Library Manager**: Automatic scanning of configured download folder, album art grid display, metadata extraction, and tracklist view.
+- **Dedicated Downloads & Status Page**: Full-screen view for downloads, active/completed/failed status tracking, responsive progress meters, and Clear Completed button.
+- **Local Library Manager**: Automatic scanning of configured download folder, album art grid display, metadata extraction, and album inspection modal.
 
 ### Changed
-- **GitLab Decoupling**: Build now builds directly from local `./src` in Dockerfile with zero external git cloning.
+- **Modern UI Overhaul**: Streamlined layout and refreshed component styles for a clean, modern user experience.
+- **Simplified Navigation**: Removed unnecessary About and Favorites routes and sidebar links.
+- **Theme Modernization**: Simplified theme selection to strictly Dark Mode (default) and Light Mode with a Sun/Moon toggle; purged legacy themes.
+- **Decoupled Builds**: Web app and server build directly from local `./src` in Dockerfile with zero external git cloning.
+
+### Fixed
+- **Library Album Modal Trapping**: Resolved CSS containing block bug caused by `transform` on `#container`, allowing album tracklists and artwork to open cleanly upon clicking cards.
+- **Downloads Navigation**: Removed redundant right-hand download drawer (`TheDownloadBar.vue`) and centralized all downloads monitoring into `/downloads`.
 
 ## [2022.12.14-r222] - 2026-11-12
 
