@@ -6,15 +6,18 @@ import { ref, watch } from '@vue/composition-api'
 
 const THEMES = {
 	dark: 'dark',
-	light: 'light',
-	purple: 'purple'
+	light: 'light'
 }
 
-const initialTheme = localStorage.getItem('selectedTheme') || document.documentElement.dataset.theme || THEMES.dark
-const currentTheme = ref(initialTheme)
+let savedTheme = localStorage.getItem('selectedTheme') || document.documentElement.dataset.theme
+if (savedTheme !== THEMES.dark && savedTheme !== THEMES.light) {
+	savedTheme = THEMES.dark
+}
+
+const currentTheme = ref(savedTheme)
+document.documentElement.dataset.theme = savedTheme
 
 watch(currentTheme, (newTheme, oldTheme) => {
-	// No operation needed
 	if (oldTheme === newTheme) return
 
 	localStorage.setItem('selectedTheme', newTheme)
@@ -24,7 +27,6 @@ watch(currentTheme, (newTheme, oldTheme) => {
 })
 
 function animateAllElements() {
-	// Animating everything to have a smoother theme switch
 	const allElements = document.querySelectorAll('*')
 
 	allElements.forEach(el => {
@@ -40,7 +42,12 @@ function animateAllElements() {
 	})
 }
 
+function toggleTheme() {
+	currentTheme.value = currentTheme.value === THEMES.dark ? THEMES.light : THEMES.dark
+}
+
 export const useTheme = () => ({
 	THEMES,
-	currentTheme
+	currentTheme,
+	toggleTheme
 })
