@@ -6,7 +6,6 @@ module.exports = {
 		purgeLayersByDefault: true
 	},
 	purge: {
-		// https://medium.com/@kyis/vue-tailwind-purgecss-the-right-way-c70d04461475
 		content: [`./public/**/*.html`, `./public/**/*.ejs`, `./src/**/*.vue`, `./src/**/*.js`],
 		defaultExtractor(content) {
 			const contentWithoutStyleBlocks = content.replace(/<style[^]+?<\/style>/gi, '')
@@ -31,17 +30,19 @@ module.exports = {
 					600: 'hsl(0, 0%, 60%)',
 					700: 'hsl(0, 0%, 70%)',
 					800: 'hsl(0, 0%, 80%)',
-					840: 'hsl(0, 0%, 84%)', // Remove maybe
-					870: 'hsl(0, 0%, 87%)', // Remove maybe
+					840: 'hsl(0, 0%, 84%)',
+					870: 'hsl(0, 0%, 87%)',
 					900: 'hsl(0, 0%, 90%)',
-					930: 'hsl(0, 0%, 93%)' // Remove maybe
+					930: 'hsl(0, 0%, 93%)'
 				},
-				primary: 'hsl(210, 100%, 52%)',
+				primary: 'var(--primary-color)',
 				background: {
 					main: 'var(--main-background)',
 					secondary: 'var(--secondary-background)'
 				},
 				foreground: 'var(--foreground)',
+				secondary: 'var(--secondary-text)',
+				card: 'var(--card-background)',
 				panels: {
 					bg: 'var(--panels-background)'
 				}

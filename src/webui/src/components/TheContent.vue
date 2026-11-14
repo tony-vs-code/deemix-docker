@@ -64,44 +64,47 @@ export default {
 
 <style>
 #container {
-	--container-width: 95%;
 	margin: 0 auto;
-	max-width: 1280px;
-	width: var(--container-width);
-	transform: scale(1);
+	max-width: 1400px;
+	width: 94%;
+	padding-bottom: 3rem;
 }
-@media only screen and (min-width: 601px) {
+
+@media only screen and (min-width: 768px) {
 	#container {
-		--container-width: 85%;
+		width: 92%;
 	}
 }
-@media only screen and (min-width: 993px) {
+
+@media only screen and (min-width: 1280px) {
 	#container {
-		--container-width: 70%;
+		width: 90%;
 	}
 }
 
 main {
 	background-color: var(--main-background);
-	padding-right: 5px;
+	padding: 0 1rem;
 	width: 100%;
-	height: calc(100vh - 93px);
-	overflow-y: scroll;
+	flex: 1 1 auto;
+	overflow-y: auto;
 	overflow-x: hidden;
 }
 
 main::-webkit-scrollbar {
-	width: 10px;
+	width: 8px;
 }
 
 main::-webkit-scrollbar-track {
-	background: var(--main-background);
+	background: transparent;
 }
 
 main::-webkit-scrollbar-thumb {
 	background: var(--main-scroll);
-	border-radius: 4px;
-	width: 6px;
-	padding: 0px 2px;
+	border-radius: 9999px;
+}
+
+main::-webkit-scrollbar-thumb:hover {
+	background: var(--secondary-text);
 }
 </style>

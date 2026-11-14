@@ -1,77 +1,86 @@
 <template>
 	<aside
 		id="sidebar"
-		:class="{ 'slim-sidebar w-12': isSlim }"
-		:style="{ minWidth: isSlim ? null : '14rem' }"
+		:class="{ 'slim-sidebar': isSlim }"
 		aria-label="sidebar"
-		class="top-0 left-0 flex flex-col h-screen bg-panels-bg text-foreground"
+		class="sidebar-nav"
 		role="navigation"
 	>
-		<div class="deemix-icon-container" v-html="deemixIcon" />
-		<router-link
-			v-for="link in links"
-			:key="link.name"
-			:aria-label="link.ariaLabel"
-			:class="{ 'bg-background-main': activeTablink === link.name }"
-			:to="{ name: link.routerName }"
-			class="relative flex items-center h-16 no-underline group main_tablinks hover:bg-background-main text-foreground"
-			@click.native="activeTablink = link.name"
-		>
-			<i
-				:class="{ 'text-primary': activeTablink === link.name }"
-				class="p-2 text-3xl material-icons side_icon group-hover:text-primary"
-			>
-				{{ link.icon }}
-			</i>
-			<span
-				:class="{ hidden: isSlim }"
-				class="ml-3 overflow-hidden capitalize whitespace-no-wrap main-tablinks-text"
-			>
-				{{ $t(link.label) }}
-			</span>
-			<span
-				v-if="link.name === 'about' && updateAvailable"
-				id="update-notification"
-				class="absolute w-3 h-3 bg-red-600 rounded-full"
-			></span>
-		</router-link>
-
-		<span
-			id="theme_selector"
-			:class="{ 'inline-grid gap-2': isSlim }"
-			aria-label="theme selector"
-			class="flex h-12 mt-5"
-			role="link"
-		>
-			<i class="p-2 text-3xl transition-all duration-500 cursor-default material-icons side_icon side_icon--theme">
-				brush
-			</i>
-			<div
-				id="theme_togglers"
-				:class="{ 'inline-grid gap-2': isSlim }"
-				class="relative flex items-center w-full justify-evenly"
-			>
-				<div
-					v-for="theme of THEMES"
-					:key="theme"
-					:class="[{ 'theme_toggler--active': currentTheme === theme }, `theme_toggler--${theme}`]"
-					class="w-6 h-6 border rounded-full cursor-pointer theme_toggler border-grayscale-500 gap"
-					@click="currentTheme = theme"
-				/>
+		<!-- Brand Header -->
+		<div class="brand-header">
+			<div class="deemix-icon-container" v-html="deemixIcon" />
+			<div v-if="!isSlim" class="brand-text">
+				<span class="brand-name">deemix</span>
+				<span class="brand-badge">PRO</span>
 			</div>
-		</span>
+		</div>
+
+		<!-- Nav Links -->
+		<nav class="nav-links-list">
+			<router-link
+				v-for="link in links"
+				:key="link.name"
+				:aria-label="link.ariaLabel"
+				:class="{ 'active-link': activeTablink === link.name }"
+				:to="{ name: link.routerName }"
+				class="nav-item group"
+				@click.native="activeTablink = link.name"
+			>
+				<div class="nav-icon-wrapper">
+					<i class="material-icons nav-icon group-hover:text-primary">
+						{{ link.icon }}
+					</i>
+					<!-- Downloading pulse badge on icon if slim -->
+					<span
+						v-if="isSlim && link.name === 'downloads' && downloadingCount > 0"
+						class="slim-download-dot"
+					></span>
+				</div>
+
+				<span v-if="!isSlim" class="nav-label">
+					{{ $t(link.label) }}
+				</span>
+
+				<!-- Active downloads badge on Downloads tab -->
+				<span
+					v-if="!isSlim && link.name === 'downloads' && downloadingCount > 0"
+					class="download-count-badge"
+					:title="`${downloadingCount} active downloads`"
+				>
+					<span class="badge-pulse"></span>
+					{{ downloadingCount }}
+				</span>
+			</router-link>
+		</nav>
+
+		<!-- Bottom Theme Toggler -->
+		<div class="sidebar-footer">
+			<button
+				class="theme-toggle-btn"
+				:title="currentTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+				@click="toggleTheme"
+			>
+				<i class="material-icons theme-icon">
+					{{ currentTheme === 'dark' ? 'light_mode' : 'dark_mode' }}
+				</i>
+				<span v-if="!isSlim" class="theme-label">
+					{{ currentTheme === 'dark' ? 'Light Mode' : 'Dark Mode' }}
+				</span>
+			</button>
+		</div>
 	</aside>
 </template>
 
 <script>
-import { computed, defineComponent, reactive, toRefs } from '@vue/composition-api'
-
+import { computed, defineComponent, onBeforeUnmount, onMounted, reactive, ref, toRefs } from '@vue/composition-api'
 import { links } from '@/data/sidebar'
 import { useTheme } from '@/use/theme'
-
+import { socket } from '@/utils/socket'
+import { fetchData } from '@/utils/api'
 import deemixIcon from '@/assets/deemix-icon.svg'
 
 export default defineComponent({
+	name: 'TheSidebar',
 	setup(_, ctx) {
 		const activeTab = links.find(link => link.routerName === ctx.root.$route.name)
 
@@ -79,25 +88,107 @@ export default defineComponent({
 			activeTablink: activeTab ? activeTab.name : 'home',
 			links
 		})
-		const { THEMES, currentTheme } = useTheme()
 
-		/* === Add update notification near info === */
-		const updateAvailable = computed(() => ctx.root.$store.state.appInfo.updateAvailable)
+		const { currentTheme, toggleTheme } = useTheme()
+
+		// Active downloads tracker for the badge
+		const queueList = ref({})
+
+		const isDownloading = item => {
+			return item && (item.status === 'downloading' || item.status === 'converting' || (item.progress > 0 && item.progress < 100 && item.status !== 'download finished'))
+		}
+
+		const downloadingCount = computed(() => {
+			return Object.values(queueList.value).filter(isDownloading).length
+		})
+
+		const updateItem = (uuid, data) => {
+			if (!queueList.value[uuid]) return
+			queueList.value = {
+				...queueList.value,
+				[uuid]: { ...queueList.value[uuid], ...data }
+			}
+		}
+
+		const handleAddedToQueue = item => {
+			if (!item) return
+			if (Array.isArray(item)) {
+				item.forEach(i => handleAddedToQueue(i))
+				return
+			}
+			queueList.value = {
+				...queueList.value,
+				[item.uuid]: item
+			}
+		}
+
+		const handleStartDownload = uuid => {
+			updateItem(uuid, { status: 'downloading' })
+		}
+
+		const handleFinishDownload = uuid => {
+			updateItem(uuid, { status: 'download finished' })
+		}
+
+		const handleRemoveFromQueue = uuid => {
+			const updated = { ...queueList.value }
+			delete updated[uuid]
+			queueList.value = updated
+		}
+
+		const handleRemoveAllDownloads = () => {
+			queueList.value = {}
+		}
+
+		const handleRemoveFinishedDownloads = () => {
+			const updated = { ...queueList.value }
+			Object.keys(updated).forEach(uuid => {
+				if (updated[uuid].status === 'download finished') {
+					delete updated[uuid]
+				}
+			})
+			queueList.value = updated
+		}
+
+		onMounted(async () => {
+			socket.on('startDownload', handleStartDownload)
+			socket.on('finishDownload', handleFinishDownload)
+			socket.on('addedToQueue', handleAddedToQueue)
+			socket.on('removedFromQueue', handleRemoveFromQueue)
+			socket.on('removedAllDownloads', handleRemoveAllDownloads)
+			socket.on('removedFinishedDownloads', handleRemoveFinishedDownloads)
+
+			try {
+				const queueData = await fetchData('getQueue')
+				if (queueData && queueData.queue) {
+					queueList.value = queueData.queue
+				}
+			} catch (e) {
+				// socket will handle subsequent updates
+			}
+		})
+
+		onBeforeUnmount(() => {
+			socket.off('startDownload', handleStartDownload)
+			socket.off('finishDownload', handleFinishDownload)
+			socket.off('addedToQueue', handleAddedToQueue)
+			socket.off('removedFromQueue', handleRemoveFromQueue)
+			socket.off('removedAllDownloads', handleRemoveAllDownloads)
+			socket.off('removedFinishedDownloads', handleRemoveFinishedDownloads)
+		})
 
 		ctx.root.$router.afterEach(to => {
 			const linkInSidebar = state.links.find(link => link.routerName === to.name)
-
 			if (!linkInSidebar) return
-
 			state.activeTablink = linkInSidebar.name
 		})
 
 		return {
 			...toRefs(state),
-			updateAvailable,
-			THEMES,
 			currentTheme,
+			toggleTheme,
 			isSlim: computed(() => ctx.root.$store.getters.getSlimSidebar),
+			downloadingCount,
 			deemixIcon
 		}
 	}
@@ -105,38 +196,265 @@ export default defineComponent({
 </script>
 
 <style scoped>
+.sidebar-nav {
+	width: 16rem;
+	min-width: 16rem;
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--surface-glass);
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	border-right: 1px solid var(--border-color);
+	user-select: none;
+	transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+	z-index: 30;
+	position: relative;
+}
+
+.sidebar-nav.slim-sidebar {
+	width: 4rem;
+	min-width: 4rem;
+}
+
+/* Brand Header */
+.brand-header {
+	display: flex;
+	align-items: center;
+	padding: 1.5rem 1.25rem 1.25rem 1.25rem;
+	gap: 0.75rem;
+}
+
+.slim-sidebar .brand-header {
+	padding: 1rem 0;
+	justify-content: center;
+}
+
 .deemix-icon-container {
-	display: grid;
-	place-content: center;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	filter: drop-shadow(0 4px 8px rgba(59, 130, 246, 0.3));
 }
-.slim-sidebar .deemix-icon-container {
-	margin: 0.5rem 0;
-}
-.slim-sidebar .deemix-icon-container::v-deep svg {
-	height: 30px;
-}
+
 .deemix-icon-container::v-deep svg {
-	height: 75px;
+	height: 38px;
+	width: 38px;
 }
 
-#update-notification {
-	top: 12px;
-	left: 30px;
+.slim-sidebar .deemix-icon-container::v-deep svg {
+	height: 28px;
+	width: 28px;
 }
 
-.theme_toggler {
-	transition: border 200ms ease-in-out;
+.brand-text {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
 }
-.theme_toggler--active {
-	border-width: 3px;
+
+.brand-name {
+	font-size: 1.25rem;
+	font-weight: 800;
+	letter-spacing: -0.025em;
+	color: var(--foreground);
+	background: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
 }
-.theme_toggler--light {
-	background-color: #fff;
+
+:root[data-theme='light'] .brand-name {
+	background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
 }
-.theme_toggler--dark {
-	background-color: #141414;
+
+.brand-badge {
+	font-size: 0.625rem;
+	font-weight: 700;
+	padding: 0.15rem 0.45rem;
+	border-radius: 9999px;
+	background: var(--primary-gradient);
+	color: #ffffff;
+	letter-spacing: 0.05em;
 }
-.theme_toggler--purple {
-	background: #460eaf;
+
+/* Nav list */
+.nav-links-list {
+	display: flex;
+	flex-direction: column;
+	padding: 0.75rem 0.75rem;
+	gap: 0.35rem;
+	flex: 1;
+	overflow-y: auto;
+}
+
+.slim-sidebar .nav-links-list {
+	padding: 0.75rem 0.35rem;
+	align-items: center;
+}
+
+.nav-item {
+	display: flex;
+	align-items: center;
+	height: 2.75rem;
+	padding: 0 0.85rem;
+	border-radius: 0.75rem;
+	color: var(--secondary-text);
+	text-decoration: none;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	position: relative;
+	font-weight: 500;
+	font-size: 0.875rem;
+}
+
+.slim-sidebar .nav-item {
+	justify-content: center;
+	padding: 0;
+	width: 2.75rem;
+}
+
+.nav-item:hover {
+	color: var(--foreground);
+	background-color: var(--border-color);
+}
+
+.nav-item.active-link {
+	color: #ffffff;
+	background: var(--primary-gradient);
+	box-shadow: 0 4px 15px rgba(59, 130, 246, 0.35);
+	font-weight: 600;
+}
+
+.nav-icon-wrapper {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+}
+
+.nav-icon {
+	font-size: 1.35rem;
+	transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.nav-item:hover .nav-icon {
+	transform: scale(1.08);
+}
+
+.nav-label {
+	margin-left: 0.75rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-transform: capitalize;
+	flex: 1;
+}
+
+/* Download Badge */
+.download-count-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	padding: 0.15rem 0.5rem;
+	font-size: 0.75rem;
+	font-weight: 700;
+	border-radius: 9999px;
+	background: #06b6d4;
+	color: #ffffff;
+	box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+	margin-left: auto;
+}
+
+.active-link .download-count-badge {
+	background: #ffffff;
+	color: var(--primary-color);
+	box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.badge-pulse {
+	width: 6px;
+	height: 6px;
+	border-radius: 9999px;
+	background-color: #ffffff;
+	animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.active-link .badge-pulse {
+	background-color: var(--primary-color);
+}
+
+.slim-download-dot {
+	position: absolute;
+	top: -2px;
+	right: -2px;
+	width: 8px;
+	height: 8px;
+	border-radius: 9999px;
+	background-color: #06b6d4;
+	box-shadow: 0 0 8px #06b6d4;
+	animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+	0%, 100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	50% {
+		opacity: 0.4;
+		transform: scale(1.2);
+	}
+}
+
+/* Sidebar Footer / Theme Toggle */
+.sidebar-footer {
+	padding: 1rem 0.75rem;
+	border-top: 1px solid var(--border-color);
+}
+
+.slim-sidebar .sidebar-footer {
+	padding: 1rem 0.35rem;
+	display: flex;
+	justify-content: center;
+}
+
+.theme-toggle-btn {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	height: 2.5rem;
+	padding: 0 0.85rem;
+	border-radius: 0.75rem;
+	background: var(--secondary-background);
+	border: 1px solid var(--border-color);
+	color: var(--secondary-text);
+	font-size: 0.8125rem;
+	font-weight: 500;
+	cursor: pointer;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	outline: none;
+}
+
+.slim-sidebar .theme-toggle-btn {
+	width: 2.5rem;
+	padding: 0;
+	justify-content: center;
+}
+
+.theme-toggle-btn:hover {
+	color: var(--foreground);
+	border-color: var(--border-color-hover);
+	background-color: var(--table-highlight);
+}
+
+.theme-icon {
+	font-size: 1.25rem;
+	color: var(--primary-color);
+}
+
+.theme-label {
+	margin-left: 0.75rem;
+	white-space: nowrap;
 }
 </style>

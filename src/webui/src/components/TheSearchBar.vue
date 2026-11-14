@@ -1,31 +1,51 @@
 <template>
-	<header id="search" aria-label="searchbar" :class="{ showSearchButton }">
-		<div v-if="!showSearchButton" class="search__icon">
-			<i class="material-icons">search</i>
-		</div>
+	<header id="search-container" aria-label="searchbar" :class="{ 'with-button': showSearchButton }">
+		<div class="search-wrapper">
+			<div class="search-icon-wrapper">
+				<i class="material-icons search-icon">search</i>
+			</div>
 
-		<input
-			id="searchbar"
-			ref="searchbar"
-			class="w-full"
-			autocomplete="off"
-			type="search"
-			name="searchbar"
-			value=""
-			:placeholder="$t('searchbar')"
-			autofocus
-			@keyup="keyPerformSearch($event)"
-		/>
-		<!-- @keyup.enter.exact="onEnter"
-			@keyup.ctrl.enter="onCTRLEnter" -->
-		<a
-			v-if="showSearchButton"
-			href="#"
-			class="searchButton"
-			@contextmenu="rightClickPerformSearch"
-			@click="clickPerformSearch"
-			><i class="material-icons">search</i></a
-		>
+			<input
+				id="searchbar"
+				ref="searchbar"
+				class="search-input"
+				autocomplete="off"
+				type="search"
+				name="searchbar"
+				:value="inputValue"
+				:placeholder="$t('searchbar')"
+				autofocus
+				@input="inputValue = $event.target.value"
+				@keyup="keyPerformSearch($event)"
+			/>
+
+			<!-- Clear Button -->
+			<button
+				v-if="inputValue"
+				class="clear-btn"
+				title="Clear search"
+				@click="clearSearch"
+			>
+				<i class="material-icons text-base">close</i>
+			</button>
+
+			<!-- Ctrl+K Keyboard Hint -->
+			<div class="shortcut-badge hidden sm:flex">
+				<span>Ctrl</span>
+				<span>K</span>
+			</div>
+
+			<!-- Optional Search Action Button -->
+			<button
+				v-if="showSearchButton"
+				class="search-action-btn"
+				title="Search"
+				@contextmenu="rightClickPerformSearch"
+				@click="clickPerformSearch"
+			>
+				<i class="material-icons">arrow_forward</i>
+			</button>
+		</div>
 	</header>
 </template>
 
@@ -38,9 +58,11 @@ import { fetchData } from '@/utils/api'
 import EventBus from '@/utils/EventBus'
 
 export default defineComponent({
+	name: 'TheSearchBar',
 	setup() {
 		return {
-			lastTextSearch: ref('')
+			lastTextSearch: ref(''),
+			inputValue: ref('')
 		}
 	},
 	computed: {
@@ -50,7 +72,8 @@ export default defineComponent({
 	},
 	created() {
 		const focusSearchBar = keyEvent => {
-			if (keyEvent.keyCode === 70 && keyEvent.ctrlKey) {
+			// Ctrl+F or Ctrl+K or Cmd+K
+			if ((keyEvent.keyCode === 70 && keyEvent.ctrlKey) || (keyEvent.keyCode === 75 && (keyEvent.ctrlKey || keyEvent.metaKey))) {
 				keyEvent.preventDefault()
 				this.$refs.searchbar.focus()
 			}
@@ -58,9 +81,7 @@ export default defineComponent({
 
 		const deleteSearchBarContent = keyEvent => {
 			if (!(keyEvent.key === 'Backspace' && keyEvent.ctrlKey && keyEvent.shiftKey)) return
-
-			this.$refs.searchbar.value = ''
-			this.$refs.searchbar.focus()
+			this.clearSearch()
 		}
 
 		document.addEventListener('keydown', focusSearchBar)
@@ -72,30 +93,36 @@ export default defineComponent({
 		})
 	},
 	methods: {
+		clearSearch() {
+			this.inputValue = ''
+			if (this.$refs.searchbar) {
+				this.$refs.searchbar.value = ''
+				this.$refs.searchbar.focus()
+			}
+		},
 		async clickPerformSearch(ev) {
 			ev.preventDefault()
 			const term = this.$refs.searchbar.value
-			const isEmptySearch = term === ''
-			if (isEmptySearch) return
-
+			if (!term) return
 			await this.performSearch(term, false)
 		},
 		async rightClickPerformSearch(ev) {
 			ev.preventDefault()
 			ev.stopPropagation()
 			const term = this.$refs.searchbar.value
-			const isEmptySearch = term === ''
-			if (isEmptySearch) return
-
+			if (!term) return
 			await this.performSearch(term, true)
 		},
 		async keyPerformSearch(keyEvent) {
+			if (keyEvent.key === 'Escape') {
+				this.clearSearch()
+				return
+			}
 			const isEnterPressed = keyEvent.keyCode === 13
 			if (!isEnterPressed) return
 
 			const term = this.$refs.searchbar.value
-			const isEmptySearch = term === ''
-			if (isEmptySearch) return
+			if (!term) return
 
 			const isCtrlPressed = keyEvent.ctrlKey
 			await this.performSearch(term, isCtrlPressed)
@@ -136,19 +163,9 @@ export default defineComponent({
 					}
 				}
 
-				// ? Open downloads tab maybe?
 				sendAddToQueue(term)
 			} else {
-				// The user is searching a normal string
 				if (isShowingSearch && isSameAsLastSearch) return
-
-				/*
-				isShowing 		isSame
-				false 				false			Loading
-				false 				true			Loading (because component Search is not loaded)
-				true 					false			Loading
-				true 					true			Never
-				*/
 
 				this.lastTextSearch = term
 				await this.$router.push({
@@ -163,88 +180,133 @@ export default defineComponent({
 })
 </script>
 
-<style>
-input[type='search']::-webkit-search-cancel-button {
-	-webkit-appearance: none;
-	width: 28px;
-	height: 28px;
-	background-color: var(--foreground);
-	-webkit-mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' height='28' viewBox='0 0 24 24' width='28'%3E%%3Cpath fill='%23ffffff' d='M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z'/%3E3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3C/svg%3E");
-	mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' height='28' viewBox='0 0 24 24' width='28'%3E%%3Cpath fill='%23ffffff' d='M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z'/%3E3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3C/svg%3E");
+<style scoped>
+#search-container {
+	padding: 0.85rem 1.5rem 0.85rem 1.5rem;
+	width: 100%;
+	display: flex;
+	align-items: center;
+	position: relative;
+	z-index: 20;
 }
 
-#search {
-	background-color: var(--secondary-background);
-	padding: 0 1em;
+.search-wrapper {
+	width: 100%;
 	display: flex;
 	align-items: center;
-	border: 1px solid transparent;
-	transition: border 200ms ease-in-out;
-	border-radius: 15px;
-	margin: 10px 10px 20px 10px;
-	overflow: hidden;
+	background: var(--surface-glass);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid var(--border-color);
+	border-radius: 0.875rem;
+	padding: 0 0.85rem;
+	height: 2.85rem;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
-#search .search__icon {
-	width: 2rem;
-	height: 2rem;
+
+.search-wrapper:focus-within {
+	border-color: var(--primary-color);
+	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25), 0 4px 12px rgba(0, 0, 0, 0.2);
 }
-#search .search__icon i {
-	font-size: 2rem;
-	color: var(--foreground);
-}
-#search .search__icon i::selection {
-	background: none;
-}
-#search #searchbar {
-	height: 45px;
-	padding-left: 0.5em;
-	border: 0px;
-	border-radius: 0px;
-	background-color: var(--secondary-background);
-	color: var(--foreground);
-	font-size: 1.2rem;
-	font-family: 'Open Sans';
-	font-weight: 300;
-	margin-bottom: 0;
-}
-#search #searchbar:focus {
-	outline: none;
-}
-#search #searchbar::-webkit-search-cancel-button {
-	appearance: none;
-	width: 28px;
-	height: 28px;
-	background-color: var(--foreground);
-	mask-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' height='28' viewBox='0 0 24 24' width='28'%3E%%3Cpath fill='%23ffffff' d='M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z'/%3E3Cpath d='M0 0h24v24H0z' fill='none'/%3E%3C/svg%3E");
-}
-#search #searchbar:-webkit-autofill,
-#search #searchbar:-webkit-autofill:hover,
-#search #searchbar:-webkit-autofill:focus,
-#search #searchbar:-webkit-autofill:active {
-	box-shadow: 0 0 0 45px var(--secondary-background) inset !important;
-}
-#search .searchButton {
-	background-color: var(--primary-color);
-	color: var(--primary-text);
-	height: 100%;
-	width: 48px;
+
+.search-icon-wrapper {
 	display: flex;
-	text-decoration: none;
 	align-items: center;
 	justify-content: center;
-	border-radius: 0px 15px 15px 0px;
-	margin-left: 1em;
+	color: var(--secondary-text);
+	margin-right: 0.5rem;
 }
-#search .searchButton i {
-	font-size: 2rem;
+
+.search-icon {
+	font-size: 1.35rem;
+	transition: color 0.2s ease;
 }
-#search .searchButton i::selection {
-	background: none;
+
+.search-wrapper:focus-within .search-icon {
+	color: var(--primary-color);
 }
-#search:focus-within {
-	border: 1px solid var(--foreground);
+
+.search-input {
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+	border: none !important;
+	outline: none !important;
+	background: transparent !important;
+	color: var(--foreground) !important;
+	font-size: 0.9375rem !important;
+	font-weight: 400 !important;
+	padding: 0 !important;
+	box-shadow: none !important;
 }
-#search.showSearchButton {
-	padding: 0 0 0 1em;
+
+.search-input::placeholder {
+	color: var(--muted-text);
+}
+
+/* Hide default webkit search cancel button */
+.search-input::-webkit-search-cancel-button {
+	-webkit-appearance: none;
+	appearance: none;
+	display: none;
+}
+
+.clear-btn {
+	background: transparent;
+	border: none;
+	color: var(--secondary-text);
+	padding: 0.25rem;
+	border-radius: 9999px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	margin-right: 0.5rem;
+	transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.clear-btn:hover {
+	color: var(--foreground);
+	background-color: var(--border-color);
+}
+
+.shortcut-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding: 0.2rem 0.5rem;
+	border-radius: 0.375rem;
+	background: var(--border-color);
+	border: 1px solid var(--border-color-hover);
+	color: var(--muted-text);
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.05em;
+	user-select: none;
+}
+
+.search-action-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--primary-gradient);
+	color: #ffffff;
+	border: none;
+	height: 2rem;
+	width: 2rem;
+	border-radius: 0.5rem;
+	margin-left: 0.5rem;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.search-action-btn:hover {
+	transform: scale(1.05);
+	filter: brightness(1.1);
+}
+
+.search-action-btn i {
+	font-size: 1.15rem;
 }
 </style>

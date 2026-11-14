@@ -2,13 +2,11 @@ import Vue from 'vue'
 import VueRouter from 'vue-router'
 
 // Pages
-import About from '@components/pages/About.vue'
 import InfoArl from '@components/pages/InfoArl.vue'
 import InfoSpotifyFeatures from '@components/pages/InfoSpotifyFeatures.vue'
 import Artist from '@components/pages/Artist.vue'
 import Charts from '@components/pages/Charts.vue'
 import Errors from '@components/pages/Errors.vue'
-import Favorites from '@components/pages/Favorites.vue'
 import Home from '@components/pages/Home.vue'
 import LinkAnalyzer from '@components/pages/LinkAnalyzer.vue'
 import Search from '@components/pages/Search.vue'
@@ -68,14 +66,6 @@ const routes = [
 		}
 	},
 	{
-		path: '/favorites',
-		name: 'Favorites',
-		component: Favorites,
-		meta: {
-			notKeepAlive: true
-		}
-	},
-	{
 		path: '/downloads',
 		name: 'Downloads',
 		component: Downloads,
@@ -100,11 +90,6 @@ const routes = [
 		path: '/link-analyzer',
 		name: 'Link Analyzer',
 		component: LinkAnalyzer
-	},
-	{
-		path: '/about',
-		name: 'About',
-		component: About
 	},
 	{
 		path: '/info-arl',
@@ -148,10 +133,6 @@ const router = new VueRouter({
 router.beforeEach((to, _, next) => {
 	switch (to.name) {
 		case 'Tracklist': {
-			// const getTracklistParams = {
-			// 	type: to.params.type,
-			// 	id: to.params.id
-			// }
 			console.warn('This should never happen.')
 			break
 		}

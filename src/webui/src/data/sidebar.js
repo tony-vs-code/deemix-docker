@@ -21,13 +21,6 @@ export const links = [
 		label: 'sidebar.charts'
 	},
 	{
-		name: 'favorites',
-		ariaLabel: 'favorites',
-		routerName: 'Favorites',
-		icon: 'star',
-		label: 'sidebar.favorites'
-	},
-	{
 		name: 'downloads',
 		ariaLabel: 'downloads',
 		routerName: 'Downloads',
@@ -54,12 +47,5 @@ export const links = [
 		routerName: 'Settings',
 		icon: 'settings',
 		label: 'sidebar.settings'
-	},
-	{
-		name: 'about',
-		ariaLabel: 'info',
-		routerName: 'About',
-		icon: 'info',
-		label: 'sidebar.about'
 	}
 ]

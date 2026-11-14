@@ -8,12 +8,10 @@
 				<DeezerWarning />
 				<TheContent />
 			</div>
-
-			<TheDownloadBar />
 		</div>
 
 		<BaseLoadingPlaceholder
-			:text=loadingText
+			:text="loadingText"
 			:hidden="isSocketConnected"
 			additional-classes="absolute top-0 left-0 w-screen h-screen bg-black bg-opacity-50 z-50"
 		/>
@@ -38,13 +36,11 @@ import DeezerWarning from '@components/globals/DeezerWarning.vue'
 import TheSidebar from '@components/TheSidebar.vue'
 import TheSearchBar from '@components/TheSearchBar.vue'
 import TheContent from '@components/TheContent.vue'
-import TheDownloadBar from '@components/downloads/TheDownloadBar.vue'
 
 export default {
 	components: {
 		TheSidebar,
 		TheSearchBar,
-		TheDownloadBar,
 		TheTrackPreview,
 		TheQualityModal,
 		BaseLoadingPlaceholder,
@@ -76,11 +72,24 @@ export default {
 <style>
 .app-container {
 	display: flex;
+	width: 100vw;
+	height: 100vh;
+	overflow: hidden;
+	background-color: var(--main-background);
 }
 
 .content-container {
-	width: 100%;
+	flex: 1 1 auto;
+	width: calc(100% - 16rem);
+	min-width: 0;
 	display: flex;
 	flex-direction: column;
+	height: 100vh;
+	overflow: hidden;
+	background-color: var(--main-background);
+}
+
+.slim-sidebar ~ .content-container {
+	width: calc(100% - 3rem);
 }
 </style>
