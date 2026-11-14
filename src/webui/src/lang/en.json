@@ -1,0 +1,79 @@
+{
+  "sidebar": {
+    "home": "home",
+    "search": "search",
+    "charts": "charts",
+    "favorites": "favorites",
+    "downloads": "downloads",
+    "library": "library",
+    "linkAnalyzer": "link analyzer",
+    "settings": "settings",
+    "logs": "logs",
+    "about": "about"
+  },
+  "downloadsPage": {
+    "title": "Downloads",
+    "subtitle": "Manage active downloads and transfer history",
+    "clearCompleted": "Clear Completed",
+    "cancelAll": "Cancel All",
+    "tracks": "tracks",
+    "failedTracks": "failed",
+    "downloadErrorsOccurred": "Download errors occurred",
+    "retry": "Retry Download",
+    "remove": "Remove from Queue",
+    "tabs": {
+      "all": "All",
+      "downloading": "Downloading",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "status": {
+      "downloading": "Downloading",
+      "converting": "Converting",
+      "completed": "Completed",
+      "failed": "Failed",
+      "queued": "Queued"
+    },
+    "empty": {
+      "allTitle": "No Downloads in Queue",
+      "allMessage": "Your download queue is currently empty. Search for tracks, albums, or playlists to download music.",
+      "downloadingTitle": "No Active Downloads",
+      "downloadingMessage": "There are no active downloads currently running.",
+      "completedTitle": "No Completed Downloads",
+      "completedMessage": "Completed downloads will appear here once finished.",
+      "failedTitle": "No Failed Downloads",
+      "failedMessage": "Great news! There are no failed downloads in your queue."
+    }
+  },
+  "libraryPage": {
+    "title": "Library Manager",
+    "downloadPath": "Download Folder",
+    "scanLibrary": "Scan Library",
+    "scanning": "Scanning...",
+    "scanningLibrary": "Scanning music library...",
+    "scanningDescription": "Reading audio files and metadata from your download directory.",
+    "searchPlaceholder": "Search by artist or album title...",
+    "showingAlbums": "Showing {count} of {total} albums",
+    "tracks": "tracks",
+    "tracklist": "Tracklist",
+    "close": "Close",
+    "stats": {
+      "artists": "Artists",
+      "albums": "Albums",
+      "tracks": "Tracks",
+      "totalSize": "Total Size"
+    },
+    "table": {
+      "title": "Title",
+      "artist": "Artist",
+      "format": "Format",
+      "size": "Size"
+    },
+    "empty": {
+      "emptyTitle": "Music Library Is Empty",
+      "emptyMessage": "No audio files found in your configured download directory. Check your path in Settings or download some music.",
+      "noSearchTitle": "No Matching Albums",
+      "noSearchMessage": "No artists or albums match your search query."
+    }
+  }
+}

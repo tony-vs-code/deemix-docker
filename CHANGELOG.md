@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Dedicated Downloads & Status Page**: Full-screen view for downloads, active/completed/failed status tracking, live progress, and Clear Completed button.
+- **Local Library Manager**: Automatic scanning of configured download folder, album art grid display, metadata extraction, and tracklist view.
+
+### Changed
+- **GitLab Decoupling**: Build now builds directly from local `./src` in Dockerfile with zero external git cloning.
+
 ## [2022.12.14-r222] - 2026-11-12
 
 ### Added

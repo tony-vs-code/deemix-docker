@@ -3,8 +3,16 @@ agents/
 .agents/
 
 # Local configuration and runtime data
-config/
-downloads/
+/config/
+/downloads/
 *.log
 .env
 .cache/
+
+# Dependencies and build outputs
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+*.local
+
