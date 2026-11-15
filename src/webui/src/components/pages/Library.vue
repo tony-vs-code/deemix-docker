@@ -161,8 +161,8 @@
 				class="albums-grid"
 			>
 				<div
-					v-for="album in paginatedAlbums"
-					:key="album.path || `${album.artist}-${album.title}`"
+					v-for="(album, index) in paginatedAlbums"
+					:key="'album-grid-' + (album.path && album.path !== '.' ? album.path : (album.artist + '-' + album.title)) + '-' + index"
 					class="album-card group"
 					@click="openAlbumModal(album)"
 				>
@@ -257,8 +257,8 @@
 						</thead>
 						<tbody>
 							<tr
-								v-for="album in paginatedAlbums"
-								:key="album.path || `${album.artist}-${album.title}`"
+								v-for="(album, index) in paginatedAlbums"
+								:key="'album-list-' + (album.path && album.path !== '.' ? album.path : (album.artist + '-' + album.title)) + '-' + index"
 								class="track-row album-list-row"
 								@click="openAlbumModal(album)"
 							>
@@ -372,8 +372,8 @@
 				class="artists-grid"
 			>
 				<div
-					v-for="artist in filteredArtists"
-					:key="artist.name"
+					v-for="(artist, index) in filteredArtists"
+					:key="'artist-' + artist.name + '-' + index"
 					class="artist-card"
 					@click="selectArtist(artist)"
 				>
@@ -430,7 +430,7 @@
 						<tbody>
 							<tr
 								v-for="(track, index) in paginatedTracks"
-								:key="track.path || `${track.title}-${index}`"
+								:key="'track-' + (track.path || track.title) + '-' + index"
 								class="track-row track-playable-row"
 								:class="{ 'row-is-playing': isCurrentTrack(track) }"
 								@click="playTrack(track, filteredTracks)"
@@ -624,7 +624,7 @@
 							<tbody>
 								<tr
 									v-for="(track, index) in selectedAlbum.tracks"
-									:key="track.path || `${track.title}-${index}`"
+									:key="'modal-track-' + (track.path || track.title) + '-' + index"
 									class="track-row track-playable-row"
 									:class="{ 'row-is-playing': isCurrentTrack(track) }"
 									@click="playTrack(track, selectedAlbum.tracks)"
@@ -935,8 +935,8 @@ export default {
 		},
 		filteredAlbums() {
 			let albums = this.cachedAlbums
-			if (this.searchQuery && this.searchQuery.trim()) {
-				const query = this.searchQuery.toLowerCase().trim()
+			const query = (this.searchQuery || '').toLowerCase().trim()
+			if (query) {
 				albums = albums.filter(album => {
 					if (album._searchIndex) {
 						return album._searchIndex.includes(query)
@@ -945,19 +945,22 @@ export default {
 					const artistMatch = (album.artist || '').toLowerCase().includes(query)
 					const trackMatch = (album.tracks || []).some(t => (t.title || '').toLowerCase().includes(query))
 					return titleMatch || artistMatch || trackMatch
-				}).map(album => {
-					const titleMatch = (album.title || '').toLowerCase().includes(query)
-					const artistMatch = (album.artist || '').toLowerCase().includes(query)
-					const matchingTracks = (album.tracks || [])
+				})
+				for (let i = 0; i < albums.length; i++) {
+					const alb = albums[i]
+					const titleMatch = (alb.title || '').toLowerCase().includes(query)
+					const artistMatch = (alb.artist || '').toLowerCase().includes(query)
+					const matchingTracks = (alb.tracks || [])
 						.filter(t => (t.title || '').toLowerCase().includes(query))
 						.map(t => t.title)
-					return {
-						...album,
-						matchedTracks: matchingTracks,
-						matchedByTrack: !titleMatch && !artistMatch && matchingTracks.length > 0
-					}
-				})
+					alb.matchedTracks = matchingTracks
+					alb.matchedByTrack = !titleMatch && !artistMatch && matchingTracks.length > 0
+				}
 			} else {
+				for (let i = 0; i < albums.length; i++) {
+					albums[i].matchedTracks = null
+					albums[i].matchedByTrack = false
+				}
 				albums = [...albums]
 			}
 
@@ -987,8 +990,8 @@ export default {
 		filteredTracks() {
 			if (this.activeView !== 'tracks') return []
 			let tracks = this.cachedTracks
-			if (this.searchQuery.trim()) {
-				const q = this.searchQuery.toLowerCase().trim()
+			const q = (this.searchQuery || '').toLowerCase().trim()
+			if (q) {
 				tracks = tracks.filter(
 					t =>
 						(t.title || '').toLowerCase().includes(q) ||
@@ -1019,8 +1022,8 @@ export default {
 		},
 		filteredArtists() {
 			let artists = [...this.artists]
-			if (this.searchQuery.trim()) {
-				const q = this.searchQuery.toLowerCase().trim()
+			const q = (this.searchQuery || '').toLowerCase().trim()
+			if (q) {
 				artists = artists.filter(a => (a.name || '').toLowerCase().includes(q))
 			}
 
