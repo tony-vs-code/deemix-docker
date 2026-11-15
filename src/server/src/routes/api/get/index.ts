@@ -21,6 +21,7 @@ import checkForUpdates from './checkForUpdates'
 import getLibrary from './getLibrary'
 import getLibraryCover from './getLibraryCover'
 import streamLibraryTrack from './streamLibraryTrack'
+import searchLibrary from './searchLibrary'
 
 export default [
 	connect,
@@ -45,5 +46,6 @@ export default [
 	checkForUpdates,
 	getLibrary,
 	getLibraryCover,
-	streamLibraryTrack
+	streamLibraryTrack,
+	searchLibrary
 ]

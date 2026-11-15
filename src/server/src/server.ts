@@ -16,6 +16,7 @@ import { logger, removeOldLogs } from './helpers/logger'
 import { loadLoginCredentials } from './helpers/loginStorage'
 import { Port, Listener } from './types'
 import { DeemixApp } from './app'
+import { setLibraryListener } from './helpers/libraryDb'
 import { normalizePort } from './helpers/port'
 import { WEBUI_DIR } from './helpers/paths'
 
@@ -54,6 +55,7 @@ export class DeemixServer {
 		}
 
 		this.deemixApp = new DeemixApp(listener)
+		setLibraryListener(listener)
 		if (this.isSingleUser) loadLoginCredentials()
 	}
 

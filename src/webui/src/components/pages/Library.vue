@@ -86,16 +86,17 @@
 			<div class="search-box">
 				<i class="material-icons search-box-icon">search</i>
 				<input
-					v-model="searchQuery"
+					:value="searchInput"
 					type="text"
 					:placeholder="searchPlaceholder"
 					class="search-box-input"
+					@input="handleSearchInput($event.target.value)"
 				/>
 				<button
-					v-if="searchQuery"
+					v-if="searchInput"
 					class="search-clear-btn"
 					title="Clear"
-					@click="searchQuery = ''"
+					@click="clearSearch"
 				>
 					<i class="material-icons text-base">close</i>
 				</button>
@@ -218,6 +219,15 @@
 						<p class="album-artist" :title="album.artist">
 							{{ album.artist }}
 						</p>
+						<div
+							v-if="album.matchedTracks && album.matchedTracks.length > 0"
+							class="track-match-badge"
+							:title="album.matchedTracks.join(', ')"
+						>
+							<i class="material-icons track-match-icon">audiotrack</i>
+							<span class="track-match-text truncate">Matches track: {{ album.matchedTracks[0] }}</span>
+							<span v-if="album.matchedTracks.length > 1" class="track-match-more">+{{ album.matchedTracks.length - 1 }}</span>
+						</div>
 						<div class="album-submeta">
 							<span v-if="album.formattedTotalSize" class="album-size">
 								{{ album.formattedTotalSize }}
@@ -267,6 +277,15 @@
 								<td class="col-title track-title-cell">
 									<div class="track-title-text" :title="album.title">
 										{{ album.title }}
+									</div>
+									<div
+										v-if="album.matchedTracks && album.matchedTracks.length > 0"
+										class="track-match-badge-list"
+										:title="album.matchedTracks.join(', ')"
+									>
+										<i class="material-icons track-match-icon">audiotrack</i>
+										<span class="track-match-text truncate">Matches track: {{ album.matchedTracks[0] }}</span>
+										<span v-if="album.matchedTracks.length > 1" class="track-match-more">+{{ album.matchedTracks.length - 1 }}</span>
 									</div>
 								</td>
 								<td class="col-artist track-artist-cell" :title="album.artist">
@@ -841,7 +860,9 @@ export default {
 			totalTracks: 0,
 			totalAlbums: 0,
 			totalArtists: 0,
+			searchInput: '',
 			searchQuery: '',
+			searchDebounceTimer: null,
 			selectedAlbum: null,
 			pendingDelete: null,
 			albumCurrentPage: 1,
@@ -878,7 +899,7 @@ export default {
 		searchPlaceholder() {
 			if (this.activeView === 'artists') return 'Search artists...'
 			if (this.activeView === 'tracks') return 'Search tracks, artists, or albums...'
-			return 'Search albums by title or artist...'
+			return 'Search albums by title, artist, or track name...'
 		},
 		totalAlbumPages() {
 			return Math.ceil(this.filteredAlbums.length / this.albumPageSize) || 1
@@ -914,12 +935,27 @@ export default {
 		},
 		filteredAlbums() {
 			let albums = this.cachedAlbums
-			if (this.searchQuery.trim()) {
+			if (this.searchQuery && this.searchQuery.trim()) {
 				const query = this.searchQuery.toLowerCase().trim()
 				albums = albums.filter(album => {
+					if (album._searchIndex) {
+						return album._searchIndex.includes(query)
+					}
 					const titleMatch = (album.title || '').toLowerCase().includes(query)
 					const artistMatch = (album.artist || '').toLowerCase().includes(query)
-					return titleMatch || artistMatch
+					const trackMatch = (album.tracks || []).some(t => (t.title || '').toLowerCase().includes(query))
+					return titleMatch || artistMatch || trackMatch
+				}).map(album => {
+					const titleMatch = (album.title || '').toLowerCase().includes(query)
+					const artistMatch = (album.artist || '').toLowerCase().includes(query)
+					const matchingTracks = (album.tracks || [])
+						.filter(t => (t.title || '').toLowerCase().includes(query))
+						.map(t => t.title)
+					return {
+						...album,
+						matchedTracks: matchingTracks,
+						matchedByTrack: !titleMatch && !artistMatch && matchingTracks.length > 0
+					}
 				})
 			} else {
 				albums = [...albums]
@@ -1024,6 +1060,9 @@ export default {
 	destroyed() {
 		socket.off('libraryUpdated', this.handleLibraryUpdated)
 		document.removeEventListener('keydown', this.handleKeyDown)
+		if (this.searchDebounceTimer) {
+			clearTimeout(this.searchDebounceTimer)
+		}
 		if (this.$refs.audioPlayer) {
 			this.$refs.audioPlayer.pause()
 		}
@@ -1173,6 +1212,10 @@ export default {
 			;(data.artists || []).forEach(artist => {
 				if (Array.isArray(artist.albums)) {
 					artist.albums.forEach(album => {
+						const tracksTitleStr = Array.isArray(album.tracks)
+							? album.tracks.map(t => t.title || '').join(' ')
+							: ''
+						album._searchIndex = `${album.title || ''} ${album.artist || ''} ${tracksTitleStr}`.toLowerCase()
 						albums.push(album)
 						if (Array.isArray(album.tracks)) {
 							album.tracks.forEach(track => {
@@ -1231,7 +1274,25 @@ export default {
 				this.loadLibrary()
 			}
 		},
+		handleSearchInput(value) {
+			this.searchInput = value
+			if (this.searchDebounceTimer) {
+				clearTimeout(this.searchDebounceTimer)
+			}
+			this.searchDebounceTimer = setTimeout(() => {
+				this.searchQuery = this.searchInput
+			}, 150)
+		},
+		clearSearch() {
+			if (this.searchDebounceTimer) {
+				clearTimeout(this.searchDebounceTimer)
+			}
+			this.searchInput = ''
+			this.searchQuery = ''
+		},
 		selectArtist(artist) {
+			if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer)
+			this.searchInput = artist.name
 			this.searchQuery = artist.name
 			this.activeView = 'albums'
 		},
@@ -3048,5 +3109,55 @@ export default {
 		min-width: 0;
 		max-width: 9rem;
 	}
+}
+
+/* Track Match Badges on Album Cards */
+.track-match-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	margin-top: 0.35rem;
+	padding: 0.15rem 0.45rem;
+	border-radius: 0.375rem;
+	background: rgba(6, 182, 212, 0.15);
+	border: 1px solid rgba(6, 182, 212, 0.35);
+	color: #06b6d4;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	max-width: 100%;
+}
+
+.track-match-badge-list {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	margin-top: 0.2rem;
+	padding: 0.1rem 0.4rem;
+	border-radius: 0.375rem;
+	background: rgba(6, 182, 212, 0.15);
+	border: 1px solid rgba(6, 182, 212, 0.35);
+	color: #06b6d4;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	max-width: 22rem;
+}
+
+.track-match-icon {
+	font-size: 0.8rem;
+	flex-shrink: 0;
+}
+
+.track-match-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.track-match-more {
+	font-size: 0.625rem;
+	background: rgba(6, 182, 212, 0.3);
+	padding: 0 0.25rem;
+	border-radius: 0.25rem;
+	flex-shrink: 0;
 }
 </style>
