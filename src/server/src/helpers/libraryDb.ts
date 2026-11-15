@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+// @ts-expect-error
 import deemix from 'deemix'
 import { logger } from './logger'
 
