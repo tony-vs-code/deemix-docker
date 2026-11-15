@@ -27,6 +27,7 @@ export interface AlbumMetadata {
 	totalSize: number
 	formattedTotalSize: string
 	tracks: TrackMetadata[]
+	matchedTracks?: string[]
 }
 
 export interface ArtistMetadata {
@@ -78,6 +79,72 @@ const configFolder = deemix.utils.localpaths.getConfigFolder()
 const dbFilePath = path.join(configFolder, 'library.json')
 
 let cachedLibrary: LibraryData | null = null
+let libraryListener: { send: (key: string, data?: any) => void } | null = null
+
+export function setLibraryListener(listener: { send: (key: string, data?: any) => void }) {
+	libraryListener = listener
+}
+
+export function notifyLibraryUpdated(data: LibraryData) {
+	if (libraryListener) {
+		try {
+			libraryListener.send('libraryUpdated', data)
+		} catch (e) {
+			logger.warn(`Failed to send libraryUpdated notification: ${e}`)
+		}
+	}
+}
+
+let isFetchingCovers = false
+
+function fetchMissingCoversInBackground(
+	resolvedBase: string,
+	missing: { albumTitle: string; artistName: string; fullDir: string; relDir: string }[]
+) {
+	if (isFetchingCovers || missing.length === 0) return
+	isFetchingCovers = true
+
+	setImmediate(async () => {
+		try {
+			let updatedAny = false
+			const CONCURRENCY = 3
+			for (let i = 0; i < missing.length; i += CONCURRENCY) {
+				const batch = missing.slice(i, i + CONCURRENCY)
+				await Promise.all(
+					batch.map(async item => {
+						try {
+							const savedCover = await fetchDeezerAlbumCover(item.artistName, item.albumTitle, item.fullDir)
+							if (savedCover && cachedLibrary) {
+								const relCover = path.relative(resolvedBase, savedCover)
+								const coverUrl = `api/getLibraryCover?path=${encodeURIComponent(relCover)}`
+								for (const artist of cachedLibrary.artists) {
+									for (const alb of artist.albums) {
+										if (alb.path === item.relDir || (alb.title === item.albumTitle && alb.artist === item.artistName)) {
+											alb.cover = coverUrl
+											updatedAny = true
+										}
+									}
+								}
+								logger.info(`Fetched Deezer HD cover for ${item.artistName} - ${item.albumTitle}`)
+							}
+						} catch {
+							// Ignore network errors in background cover fetch
+						}
+					})
+				)
+			}
+
+			if (updatedAny && cachedLibrary) {
+				saveLibraryToDisk(cachedLibrary)
+				notifyLibraryUpdated(cachedLibrary)
+			}
+		} catch (err) {
+			logger.warn(`Error in background Deezer cover fetch: ${err}`)
+		} finally {
+			isFetchingCovers = false
+		}
+	})
+}
 
 export function formatBytes(bytes: number, decimals = 2): string {
 	if (bytes === 0) return '0 B'
@@ -732,9 +799,10 @@ export async function scanLibrary(downloadLocation: string, force = false): Prom
 		}
 	}
 
-	// For albums that still have no cover art, query Deezer Search API in parallel (concurrency limit 4)
+	// Collect missing cover albums for asynchronous background fetching
 	const missingCoverAlbums: {
-		albumObj: { title: string; artist: string; cover: string; path: string; tracks: TrackMetadata[] }
+		albumTitle: string
+		artistName: string
 		fullDir: string
 		relDir: string
 	}[] = []
@@ -743,30 +811,13 @@ export async function scanLibrary(downloadLocation: string, force = false): Prom
 		for (const [, albumObj] of artistObj.albumsMap) {
 			if (!albumObj.cover && albumObj.path && albumObj.path !== '.') {
 				const fullDir = path.resolve(resolvedBase, albumObj.path)
-				missingCoverAlbums.push({ albumObj, fullDir, relDir: albumObj.path })
-			}
-		}
-	}
-
-	if (missingCoverAlbums.length > 0) {
-		const CONCURRENCY = 4
-		for (let i = 0; i < missingCoverAlbums.length; i += CONCURRENCY) {
-			const batch = missingCoverAlbums.slice(i, i + CONCURRENCY)
-			await Promise.all(
-				batch.map(async ({ albumObj, fullDir, relDir }) => {
-					try {
-						const savedCover = await fetchDeezerAlbumCover(albumObj.artist, albumObj.title, fullDir)
-						if (savedCover) {
-							const relCover = path.relative(resolvedBase, savedCover)
-							dirCoverMap.set(relDir, relCover)
-							albumObj.cover = `api/getLibraryCover?path=${encodeURIComponent(relCover)}`
-							logger.info(`Fetched Deezer HD cover for ${albumObj.artist} - ${albumObj.title}`)
-						}
-					} catch {
-						// Ignore network errors during cover art fetch
-					}
+				missingCoverAlbums.push({
+					albumTitle: albumObj.title,
+					artistName: albumObj.artist,
+					fullDir,
+					relDir: albumObj.path
 				})
-			)
+			}
 		}
 	}
 
@@ -823,7 +874,213 @@ export async function scanLibrary(downloadLocation: string, force = false): Prom
 	}
 
 	saveLibraryToDisk(libraryData)
+
+	// Make Deezer cover fetching completely asynchronous in the background (<10ms return)
+	if (missingCoverAlbums.length > 0) {
+		fetchMissingCoversInBackground(resolvedBase, missingCoverAlbums)
+	}
+
 	return libraryData
+}
+
+export interface SearchLibraryOptions {
+	query?: string
+	type?: string // 'albums' | 'tracks' | 'artists' | 'all'
+	sortBy?: string
+	page?: number
+	limit?: number
+}
+
+export interface SearchLibraryResult {
+	query: string
+	type: string
+	page: number
+	limit: number
+	total: number
+	totalPages?: number
+	albums?: AlbumMetadata[]
+	tracks?: (TrackMetadata & { albumTitle?: string; albumCover?: string })[]
+	artists?: ArtistMetadata[]
+	totalAlbums?: number
+	totalTracks?: number
+	totalArtists?: number
+}
+
+function fastCompare(a: string | undefined, b: string | undefined): number {
+	const sa = a || ''
+	const sb = b || ''
+	return sa < sb ? -1 : sa > sb ? 1 : 0
+}
+
+function paginate<T>(items: T[], page: number, limit: number): T[] {
+	if (limit <= 0) return items
+	const start = (page - 1) * limit
+	return items.slice(start, start + limit)
+}
+
+export async function searchLibrary(
+	downloadLocation: string,
+	options: SearchLibraryOptions = {}
+): Promise<SearchLibraryResult> {
+	const query = (options.query || '').trim().toLowerCase()
+	const type = options.type || 'all'
+	const sortBy = options.sortBy || 'title_asc'
+	const page = Math.max(1, Number(options.page) || 1)
+	const limit = Math.max(0, Number(options.limit) || 0)
+
+	let library = cachedLibrary
+	if (!library || library.downloadLocation !== downloadLocation) {
+		library = loadLibraryFromDisk()
+		if (!library || library.downloadLocation !== downloadLocation) {
+			library = await getOrInitLibrary(downloadLocation)
+		}
+	}
+
+	const allArtists = library.artists || []
+	const allAlbums: AlbumMetadata[] = []
+	const allTracks: (TrackMetadata & { albumTitle?: string; albumCover?: string })[] = []
+
+	for (const artist of allArtists) {
+		for (const album of artist.albums || []) {
+			allAlbums.push(album)
+			for (const track of album.tracks || []) {
+				allTracks.push({
+					...track,
+					albumTitle: album.title,
+					albumCover: album.cover
+				})
+			}
+		}
+	}
+
+	// 1. Filter Albums: Match by album title, artist, AND ANY track title in album.tracks!
+	let matchedAlbums: AlbumMetadata[] = allAlbums
+	if (query) {
+		const filtered: AlbumMetadata[] = []
+		for (const album of allAlbums) {
+			const titleMatch = (album.title || '').toLowerCase().includes(query)
+			const artistMatch = (album.artist || '').toLowerCase().includes(query)
+			const matchingTrackTitles: string[] = []
+			for (const track of album.tracks || []) {
+				if ((track.title || '').toLowerCase().includes(query)) {
+					matchingTrackTitles.push(track.title)
+				}
+			}
+
+			if (titleMatch || artistMatch || matchingTrackTitles.length > 0) {
+				filtered.push({
+					...album,
+					matchedTracks: matchingTrackTitles
+				})
+			}
+		}
+		matchedAlbums = filtered
+	}
+
+	// 2. Filter Tracks: Match by track title, artist, album
+	let matchedTracks = allTracks
+	if (query) {
+		matchedTracks = allTracks.filter(track =>
+			(track.title || '').toLowerCase().includes(query) ||
+			(track.artist || '').toLowerCase().includes(query) ||
+			(track.album || '').toLowerCase().includes(query) ||
+			(track.albumTitle || '').toLowerCase().includes(query)
+		)
+	}
+
+	// 3. Filter Artists: Match by artist name or albums
+	let matchedArtists = allArtists
+	if (query) {
+		matchedArtists = allArtists.filter(artist => {
+			if ((artist.name || '').toLowerCase().includes(query)) return true
+			return (artist.albums || []).some(alb =>
+				(alb.title || '').toLowerCase().includes(query)
+			)
+		})
+	}
+
+	// Sorting
+	switch (sortBy) {
+		case 'title_desc':
+			matchedAlbums.sort((a, b) => fastCompare(b.title, a.title))
+			matchedTracks.sort((a, b) => fastCompare(b.title, a.title))
+			matchedArtists.sort((a, b) => fastCompare(b.name, a.name))
+			break
+		case 'artist_asc':
+			matchedAlbums.sort((a, b) => fastCompare(a.artist, b.artist) || fastCompare(a.title, b.title))
+			matchedTracks.sort((a, b) => fastCompare(a.artist, b.artist) || fastCompare(a.title, b.title))
+			matchedArtists.sort((a, b) => fastCompare(a.name, b.name))
+			break
+		case 'tracks_desc':
+			matchedAlbums.sort((a, b) => (b.tracksCount || 0) - (a.tracksCount || 0))
+			matchedTracks.sort((a, b) => fastCompare(a.title, b.title))
+			matchedArtists.sort((a, b) => (b.totalTracks || 0) - (a.totalTracks || 0))
+			break
+		case 'size_desc':
+			matchedAlbums.sort((a, b) => (b.totalSize || 0) - (a.totalSize || 0))
+			matchedTracks.sort((a, b) => (b.size || 0) - (a.size || 0))
+			matchedArtists.sort((a, b) => fastCompare(a.name, b.name))
+			break
+		case 'title_asc':
+		default:
+			matchedAlbums.sort((a, b) => fastCompare(a.title, b.title))
+			matchedTracks.sort((a, b) => fastCompare(a.title, b.title))
+			matchedArtists.sort((a, b) => fastCompare(a.name, b.name))
+			break
+	}
+
+	if (type === 'albums') {
+		const paged = paginate(matchedAlbums, page, limit)
+		return {
+			query,
+			type: 'albums',
+			page,
+			limit: limit || matchedAlbums.length,
+			total: matchedAlbums.length,
+			totalPages: limit > 0 ? Math.ceil(matchedAlbums.length / limit) : 1,
+			albums: paged
+		}
+	}
+
+	if (type === 'tracks') {
+		const paged = paginate(matchedTracks, page, limit)
+		return {
+			query,
+			type: 'tracks',
+			page,
+			limit: limit || matchedTracks.length,
+			total: matchedTracks.length,
+			totalPages: limit > 0 ? Math.ceil(matchedTracks.length / limit) : 1,
+			tracks: paged
+		}
+	}
+
+	if (type === 'artists') {
+		const paged = paginate(matchedArtists, page, limit)
+		return {
+			query,
+			type: 'artists',
+			page,
+			limit: limit || matchedArtists.length,
+			total: matchedArtists.length,
+			totalPages: limit > 0 ? Math.ceil(matchedArtists.length / limit) : 1,
+			artists: paged
+		}
+	}
+
+	return {
+		query,
+		type: 'all',
+		page,
+		limit: limit || Math.max(matchedAlbums.length, matchedTracks.length, matchedArtists.length),
+		total: matchedAlbums.length + matchedTracks.length + matchedArtists.length,
+		totalAlbums: matchedAlbums.length,
+		totalTracks: matchedTracks.length,
+		totalArtists: matchedArtists.length,
+		albums: paginate(matchedAlbums, page, limit),
+		tracks: paginate(matchedTracks, page, limit),
+		artists: paginate(matchedArtists, page, limit)
+	}
 }
 
 export async function deleteLibraryTrack(
