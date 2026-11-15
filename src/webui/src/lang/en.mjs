@@ -520,9 +520,7 @@ const en = {
 		retry: 'Retry Download',
 		remove: 'Remove from Queue',
 		tabs: {
-			all: 'All',
-			downloading: 'Downloading',
-			queued: 'Queued',
+			queue: 'Queue',
 			completed: 'Completed',
 			failed: 'Failed'
 		},
@@ -534,12 +532,8 @@ const en = {
 			queued: 'Queued'
 		},
 		empty: {
-			allTitle: 'No Downloads in Queue',
-			allMessage: 'Your download queue is currently empty. Search for tracks, albums, or playlists to download music.',
-			downloadingTitle: 'No Active Downloads',
-			downloadingMessage: 'There are no active downloads currently running.',
-			queuedTitle: 'No Queued Downloads',
-			queuedMessage: 'All items in your queue have finished or are actively downloading.',
+			queueTitle: 'Queue is Empty',
+			queueMessage: 'No active or queued downloads right now. Search for music or albums to start downloading.',
 			completedTitle: 'No Completed Downloads',
 			completedMessage: 'Completed downloads will appear here once finished.',
 			failedTitle: 'No Failed Downloads',

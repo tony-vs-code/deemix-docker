@@ -39,10 +39,10 @@
 		<div class="stats-grid">
 			<div class="stat-card">
 				<div class="stat-header">
-					<span class="stat-label">{{ $t('downloadsPage.tabs.all') }}</span>
+					<span class="stat-label">{{ $t('downloadsPage.tabs.queue') }}</span>
 					<i class="material-icons stat-icon">queue_music</i>
 				</div>
-				<div class="stat-value">{{ totalCount }}</div>
+				<div class="stat-value">{{ queueCount }}</div>
 			</div>
 
 			<div class="stat-card stat-downloading">
@@ -232,7 +232,7 @@ export default {
 			queue: [],
 			queueList: {},
 			queueComplete: [],
-			activeFilter: 'all'
+			activeFilter: 'queue'
 		}
 	},
 	computed: {
@@ -241,6 +241,9 @@ export default {
 		},
 		totalCount() {
 			return this.itemsArray.length
+		},
+		queueCount() {
+			return this.itemsArray.filter(item => this.isDownloading(item) || this.isQueued(item)).length
 		},
 		downloadingCount() {
 			return this.itemsArray.filter(this.isDownloading).length
@@ -256,71 +259,53 @@ export default {
 		},
 		filterTabs() {
 			return [
-				{ id: 'all', label: this.$t('downloadsPage.tabs.all'), count: this.totalCount, badgeClass: 'badge-muted' },
-				{ id: 'downloading', label: this.$t('downloadsPage.tabs.downloading'), count: this.downloadingCount, badgeClass: 'badge-cyan' },
-				{ id: 'queued', label: this.$t('downloadsPage.tabs.queued'), count: this.queuedCount, badgeClass: 'badge-amber' },
+				{ id: 'queue', label: this.$t('downloadsPage.tabs.queue'), count: this.queueCount, badgeClass: 'badge-cyan' },
 				{ id: 'completed', label: this.$t('downloadsPage.tabs.completed'), count: this.completedCount, badgeClass: 'badge-emerald' },
 				{ id: 'failed', label: this.$t('downloadsPage.tabs.failed'), count: this.failedCount, badgeClass: 'badge-rose' }
 			]
 		},
 		filteredItems() {
 			switch (this.activeFilter) {
-				case 'downloading':
-					return this.itemsArray.filter(item => this.isDownloading(item) || this.isQueued(item))
-				case 'queued':
-					return this.itemsArray.filter(this.isQueued)
 				case 'completed':
 					return this.itemsArray.filter(this.isCompleted)
 				case 'failed':
 					return this.itemsArray.filter(this.isFailed)
-				case 'all':
+				case 'queue':
 				default:
-					return this.itemsArray
+					return this.itemsArray.filter(item => this.isDownloading(item) || this.isQueued(item))
 			}
 		},
 		emptyStateIcon() {
 			switch (this.activeFilter) {
-				case 'downloading':
-					return 'file_download_done'
-				case 'queued':
-					return 'hourglass_empty'
 				case 'completed':
 					return 'done_all'
 				case 'failed':
 					return 'check_circle'
-				case 'all':
+				case 'queue':
 				default:
 					return 'cloud_off'
 			}
 		},
 		emptyStateTitle() {
 			switch (this.activeFilter) {
-				case 'downloading':
-					return this.$t('downloadsPage.empty.downloadingTitle')
-				case 'queued':
-					return this.$t('downloadsPage.empty.queuedTitle')
 				case 'completed':
 					return this.$t('downloadsPage.empty.completedTitle')
 				case 'failed':
 					return this.$t('downloadsPage.empty.failedTitle')
-				case 'all':
+				case 'queue':
 				default:
-					return this.$t('downloadsPage.empty.allTitle')
+					return this.$t('downloadsPage.empty.queueTitle')
 			}
 		},
 		emptyStateMessage() {
 			switch (this.activeFilter) {
-				case 'downloading':
-					return this.$t('downloadsPage.empty.downloadingMessage')
-				case 'queued':
-					return this.$t('downloadsPage.empty.queuedMessage')
 				case 'completed':
 					return this.$t('downloadsPage.empty.completedMessage')
 				case 'failed':
 					return this.$t('downloadsPage.empty.failedMessage')
-				case 'all':
+				case 'queue':
 				default:
-					return this.$t('downloadsPage.empty.allMessage')
+					return this.$t('downloadsPage.empty.queueMessage')
 			}
 		}
 	},
