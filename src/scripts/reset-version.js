@@ -1,6 +1,7 @@
-const { execSync } = require('child_process')
 const fs = require('fs')
+const path = require('path')
 
-let package = JSON.parse(fs.readFileSync('package.json'))
+const packagePath = path.join(__dirname, '..', 'package.json')
+let package = JSON.parse(fs.readFileSync(packagePath, 'utf8'))
 package.version = "0.0.0"
-fs.writeFileSync('package.json', JSON.stringify(package, null, 2)+"\n")
+fs.writeFileSync(packagePath, JSON.stringify(package, null, 2) + "\n")
