@@ -521,6 +521,8 @@ const en = {
 		remove: 'Remove from Queue',
 		tabs: {
 			queue: 'Queue',
+			downloading: 'Downloading',
+			queued: 'Queued',
 			completed: 'Completed',
 			failed: 'Failed'
 		},

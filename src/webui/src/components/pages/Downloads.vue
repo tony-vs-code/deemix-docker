@@ -47,7 +47,7 @@
 
 			<div class="stat-card stat-downloading">
 				<div class="stat-header">
-					<span class="stat-label text-cyan">{{ $t('downloadsPage.tabs.downloading') }}</span>
+					<span class="stat-label text-cyan">{{ $t('downloadsPage.status.downloading') }}</span>
 					<i class="material-icons stat-icon text-cyan" :class="{ 'spin-slow': downloadingCount > 0 }">downloading</i>
 				</div>
 				<div class="stat-value text-cyan">{{ downloadingCount }}</div>
@@ -55,7 +55,7 @@
 
 			<div class="stat-card stat-queued">
 				<div class="stat-header">
-					<span class="stat-label text-amber">{{ $t('downloadsPage.tabs.queued') }}</span>
+					<span class="stat-label text-amber">{{ $t('downloadsPage.status.queued') }}</span>
 					<i class="material-icons stat-icon text-amber">hourglass_top</i>
 				</div>
 				<div class="stat-value text-amber">{{ queuedCount }}</div>
