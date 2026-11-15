@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.17] - 2026-11-15
+
+### Added
+- High-performance Library Search API (`GET /api/searchLibrary`) supporting search across albums, tracks, and artists with in-memory caching and sub-millisecond response latency.
+- Searching for track titles on the Albums view instantly surfaces containing albums, accompanied by "Matches track" badges.
+
+### Changed
+- Decoupled external Deezer cover resolution into a background asynchronous worker so `GET /api/getLibrary` and `scanLibrary` respond in <10ms without blocking.
+
+### Fixed
+- UI lockups and frame drops resolved in `Library.vue` using 150ms search input debouncing and pre-indexed lowercase search tokens.
+
 ## [2026.11.16] - 2026-11-15
 
 ### Added
