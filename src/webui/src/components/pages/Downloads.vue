@@ -508,16 +508,27 @@ export default {
 			}
 		},
 		isDownloading(item) {
-			return item && (item.status === 'downloading' || item.status === 'converting' || (item.progress > 0 && item.progress < 100 && item.status !== 'download finished'))
+			if (!item) return false
+			if (['completed', 'withErrors', 'failed', 'download finished'].includes(item.status)) return false
+			return item.status === 'downloading' || item.status === 'converting'
 		},
 		isCompleted(item) {
-			return item && (item.status === 'download finished' || item.status === 'completed') && (!item.failed || item.failed === 0) && (!item.errors || item.errors.length === 0)
+			if (!item) return false
+			if (item.status === 'download finished' || item.status === 'completed') {
+				return (!item.failed || item.failed === 0) && (!item.errors || item.errors.length === 0)
+			}
+			return item.size > 0 && item.downloaded >= item.size && (!item.failed || item.failed === 0)
 		},
 		isFailed(item) {
-			return item && (item.status === 'failed' || (item.failed > 0) || (item.errors && item.errors.length > 0) || (item.status === 'download finished' && item.size > 0 && item.failed === item.size))
+			if (!item) return false
+			if (item.status === 'failed' || item.status === 'withErrors') return true
+			if (item.failed > 0 || (item.errors && item.errors.length > 0)) return true
+			return false
 		},
 		isQueued(item) {
-			return item && !this.isCompleted(item) && !this.isFailed(item) && !this.isDownloading(item)
+			if (!item) return false
+			if (this.isDownloading(item) || this.isCompleted(item) || this.isFailed(item)) return false
+			return item.status === 'inQueue' || this.queue.includes(item.uuid)
 		},
 		calculateProgress(item) {
 			if (!item) return 0

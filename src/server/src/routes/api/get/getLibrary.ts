@@ -4,7 +4,7 @@ import { getOrInitLibrary, scanLibrary } from '../../../helpers/libraryDb'
 
 const pathEndpoint: ApiHandler['path'] = '/getLibrary'
 
-const handler: ApiHandler['handler'] = (req, res) => {
+const handler: ApiHandler['handler'] = async (req, res) => {
 	try {
 		const deemix = req.app.get('deemix')
 		const settings = deemix?.getSettings()?.settings || deemix?.settings || {}
@@ -13,8 +13,8 @@ const handler: ApiHandler['handler'] = (req, res) => {
 		const shouldRescan = req.query.rescan === 'true' || req.query.force === 'true'
 
 		const libraryData = shouldRescan
-			? scanLibrary(downloadLocation, req.query.force === 'true')
-			: getOrInitLibrary(downloadLocation)
+			? await scanLibrary(downloadLocation, req.query.force === 'true')
+			: await getOrInitLibrary(downloadLocation)
 
 		res.send(libraryData)
 	} catch (error) {

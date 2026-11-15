@@ -295,13 +295,14 @@ export class DeemixApp {
 
 				// Auto-index library database on download completion
 				if (this.queue[currentUUID].status === 'completed' || this.queue[currentUUID].status === 'withErrors') {
-					try {
-						const downloadLocation = this.settings?.downloadLocation || '/downloads'
-						const updatedLib = scanLibrary(downloadLocation)
-						this.listener.send('libraryUpdated', updatedLib)
-					} catch (scanErr) {
-						logger.error(`Failed to auto-index completed download: ${scanErr}`)
-					}
+					const downloadLocation = this.settings?.downloadLocation || '/downloads'
+					scanLibrary(downloadLocation)
+						.then((updatedLib) => {
+							this.listener.send('libraryUpdated', updatedLib)
+						})
+						.catch((scanErr) => {
+							logger.error(`Failed to auto-index completed download: ${scanErr}`)
+						})
 				}
 			}
 			logger.info(this.queueOrder)

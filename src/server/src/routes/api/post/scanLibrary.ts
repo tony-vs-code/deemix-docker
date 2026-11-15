@@ -4,14 +4,14 @@ import { scanLibrary } from '../../../helpers/libraryDb'
 
 const pathEndpoint: ApiHandler['path'] = '/scanLibrary'
 
-const handler: ApiHandler['handler'] = (req, res) => {
+const handler: ApiHandler['handler'] = async (req, res) => {
 	try {
 		const deemix = req.app.get('deemix')
 		const settings = deemix?.getSettings()?.settings || deemix?.settings || {}
 		const downloadLocation = settings.downloadLocation || '/downloads'
 		const force = req.body?.force === true
 
-		const libraryData = scanLibrary(downloadLocation, force)
+		const libraryData = await scanLibrary(downloadLocation, force)
 		deemix?.listener?.send('libraryUpdated', libraryData)
 
 		res.send({ success: true, library: libraryData })

@@ -20,6 +20,7 @@ import spotifyStatus from './spotifyStatus'
 import checkForUpdates from './checkForUpdates'
 import getLibrary from './getLibrary'
 import getLibraryCover from './getLibraryCover'
+import streamLibraryTrack from './streamLibraryTrack'
 
 export default [
 	connect,
@@ -43,5 +44,6 @@ export default [
 	spotifyStatus,
 	checkForUpdates,
 	getLibrary,
-	getLibraryCover
+	getLibraryCover,
+	streamLibraryTrack
 ]

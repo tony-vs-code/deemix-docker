@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import https from 'https'
 // @ts-expect-error
 import deemix from 'deemix'
 import { logger } from './logger'
@@ -215,6 +216,223 @@ export function readAudioMetadata(
 	return {}
 }
 
+export function extractEmbeddedCover(audioFilePath: string, destDir: string): string | null {
+	try {
+		const ext = path.extname(audioFilePath).toLowerCase()
+		if (ext === '.mp3') {
+			const fd = fs.openSync(audioFilePath, 'r')
+			const headerBuf = Buffer.alloc(10)
+			const read = fs.readSync(fd, headerBuf, 0, 10, 0)
+			if (read < 10 || headerBuf.toString('ascii', 0, 3) !== 'ID3') {
+				fs.closeSync(fd)
+				return null
+			}
+			const version = headerBuf[3]
+			const tagSize =
+				((headerBuf[6] & 0x7f) << 21) |
+				((headerBuf[7] & 0x7f) << 14) |
+				((headerBuf[8] & 0x7f) << 7) |
+				(headerBuf[9] & 0x7f)
+
+			const toRead = Math.min(tagSize, 12 * 1024 * 1024)
+			const tagBuf = Buffer.alloc(toRead)
+			fs.readSync(fd, tagBuf, 0, toRead, 10)
+			fs.closeSync(fd)
+
+			let offset = 0
+			while (offset + 10 < toRead) {
+				const frameId = tagBuf.toString('ascii', offset, offset + 4)
+				if (!/^[A-Z0-9]{4}$/.test(frameId)) break
+
+				let frameSize = 0
+				if (version >= 4) {
+					frameSize =
+						((tagBuf[offset + 4] & 0x7f) << 21) |
+						((tagBuf[offset + 5] & 0x7f) << 14) |
+						((tagBuf[offset + 6] & 0x7f) << 7) |
+						(tagBuf[offset + 7] & 0x7f)
+				} else {
+					frameSize = tagBuf.readUInt32BE(offset + 4)
+				}
+
+				offset += 10
+				if (frameSize <= 0 || offset + frameSize > toRead) break
+
+				if (frameId === 'APIC') {
+					const frameBody = tagBuf.subarray(offset, offset + frameSize)
+					let imgStart = -1
+					let imgExt = '.jpg'
+
+					for (let i = 0; i < frameBody.length - 4; i++) {
+						if (frameBody[i] === 0xff && frameBody[i + 1] === 0xd8 && frameBody[i + 2] === 0xff) {
+							imgStart = i
+							imgExt = '.jpg'
+							break
+						} else if (
+							frameBody[i] === 0x89 &&
+							frameBody[i + 1] === 0x50 &&
+							frameBody[i + 2] === 0x4e &&
+							frameBody[i + 3] === 0x47
+						) {
+							imgStart = i
+							imgExt = '.png'
+							break
+						}
+					}
+
+					if (imgStart >= 0) {
+						const imgBuf = frameBody.subarray(imgStart)
+						const targetPath = path.join(destDir, `cover${imgExt}`)
+						try {
+							fs.writeFileSync(targetPath, imgBuf)
+							return targetPath
+						} catch {
+							return null
+						}
+					}
+				}
+
+				offset += frameSize
+			}
+		} else if (ext === '.flac') {
+			const fd = fs.openSync(audioFilePath, 'r')
+			const magicBuf = Buffer.alloc(4)
+			const read = fs.readSync(fd, magicBuf, 0, 4, 0)
+			if (read < 4 || magicBuf.toString('ascii', 0, 4) !== 'fLaC') {
+				fs.closeSync(fd)
+				return null
+			}
+
+			let fileOffset = 4
+			let isLast = false
+			const headerBuf = Buffer.alloc(4)
+
+			while (!isLast && fileOffset < 20 * 1024 * 1024) {
+				const bytesRead = fs.readSync(fd, headerBuf, 0, 4, fileOffset)
+				if (bytesRead < 4) break
+				fileOffset += 4
+
+				isLast = (headerBuf[0] & 0x80) !== 0
+				const blockType = headerBuf[0] & 0x7f
+				const blockSize = (headerBuf[1] << 16) | (headerBuf[2] << 8) | headerBuf[3]
+
+				if (blockType === 6 && blockSize > 32) {
+					const blockBuf = Buffer.alloc(blockSize)
+					fs.readSync(fd, blockBuf, 0, blockSize, fileOffset)
+					fs.closeSync(fd)
+
+					let pos = 4
+					const mimeLen = blockBuf.readUInt32BE(pos)
+					pos += 4
+					const mime = blockBuf.toString('ascii', pos, pos + mimeLen).toLowerCase()
+					pos += mimeLen
+					const descLen = blockBuf.readUInt32BE(pos)
+					pos += 4 + descLen + 16
+					if (pos + 4 <= blockSize) {
+						const picLen = blockBuf.readUInt32BE(pos)
+						pos += 4
+						if (pos + picLen <= blockSize && picLen > 0) {
+							const imgBuf = blockBuf.subarray(pos, pos + picLen)
+							const imgExt = mime.includes('png') ? '.png' : '.jpg'
+							const targetPath = path.join(destDir, `cover${imgExt}`)
+							try {
+								fs.writeFileSync(targetPath, imgBuf)
+								return targetPath
+							} catch {
+								return null
+							}
+						}
+					}
+					return null
+				}
+
+				fileOffset += blockSize
+			}
+			fs.closeSync(fd)
+		}
+	} catch {
+		// Ignore any extraction failures
+	}
+	return null
+}
+
+export function fetchDeezerAlbumCover(
+	artist: string,
+	album: string,
+	destDir: string
+): Promise<string | null> {
+	return new Promise((resolve) => {
+		try {
+			const cleanArtist = artist.replace(/\s*[([].*?[)\]]/g, '').trim()
+			const cleanAlbum = album.replace(/\s*[([].*?[)\]]/g, '').trim()
+			const query = `${cleanArtist} ${cleanAlbum}`.trim()
+			if (!query || cleanArtist.toLowerCase().includes('unknown')) return resolve(null)
+
+			const url = `https://api.deezer.com/search/album?q=${encodeURIComponent(query)}`
+			const req = https.get(url, { timeout: 4000 }, (res) => {
+				let body = ''
+				res.on('data', (chunk) => {
+					body += chunk
+				})
+				res.on('end', () => {
+					try {
+						const json = JSON.parse(body)
+						const first = json?.data && json.data[0]
+						const coverUrl = first?.cover_xl || first?.cover_big || first?.cover_medium
+						if (!coverUrl) return resolve(null)
+
+						const targetPath = path.join(destDir, 'cover.jpg')
+						let fileStream: fs.WriteStream
+						try {
+							fileStream = fs.createWriteStream(targetPath)
+						} catch {
+							return resolve(null)
+						}
+
+						let resolved = false
+						const cleanupAndResolve = (result: string | null) => {
+							if (resolved) return
+							resolved = true
+							if (!result) {
+								try { fileStream.close() } catch {}
+								try { fs.unlinkSync(targetPath) } catch {}
+							}
+							resolve(result)
+						}
+
+						fileStream.on('error', () => cleanupAndResolve(null))
+
+						const imgReq = https.get(coverUrl, { timeout: 6000 }, (imgRes) => {
+							if (imgRes.statusCode !== 200) {
+								return cleanupAndResolve(null)
+							}
+							imgRes.pipe(fileStream)
+							fileStream.on('finish', () => {
+								try { fileStream.close() } catch {}
+								cleanupAndResolve(targetPath)
+							})
+						})
+						imgReq.on('error', () => cleanupAndResolve(null))
+						imgReq.on('timeout', () => {
+							imgReq.destroy()
+							cleanupAndResolve(null)
+						})
+					} catch {
+						resolve(null)
+					}
+				})
+			})
+			req.on('error', () => resolve(null))
+			req.on('timeout', () => {
+				req.destroy()
+				resolve(null)
+			})
+		} catch {
+			resolve(null)
+		}
+	})
+}
+
 export function loadLibraryFromDisk(): LibraryData | null {
 	try {
 		if (fs.existsSync(dbFilePath)) {
@@ -245,7 +463,7 @@ export function saveLibraryToDisk(data: LibraryData): void {
 	}
 }
 
-export function getOrInitLibrary(downloadLocation: string): LibraryData {
+export async function getOrInitLibrary(downloadLocation: string): Promise<LibraryData> {
 	if (cachedLibrary && cachedLibrary.downloadLocation === downloadLocation) {
 		return cachedLibrary
 	}
@@ -260,7 +478,7 @@ export function getOrInitLibrary(downloadLocation: string): LibraryData {
 	return scanLibrary(downloadLocation)
 }
 
-export function scanLibrary(downloadLocation: string, force = false): LibraryData {
+export async function scanLibrary(downloadLocation: string, force = false): Promise<LibraryData> {
 	const resolvedBase = path.resolve(downloadLocation)
 
 	if (!fs.existsSync(resolvedBase)) {
@@ -286,6 +504,7 @@ export function scanLibrary(downloadLocation: string, force = false): LibraryDat
 	const dirCoverMap = new Map<string, string>()
 	const musicFiles: string[] = []
 	const visitedDirs = new Set<string>()
+	const dirAudioFiles = new Map<string, string[]>()
 
 	function scanDirectory(currentDir: string, depth = 0) {
 		if (depth > 8) return
@@ -309,6 +528,7 @@ export function scanLibrary(downloadLocation: string, force = false): LibraryDat
 		const subDirs: string[] = []
 		let foundCover: string | null = null
 		let firstImage: string | null = null
+		const localAudio: string[] = []
 
 		for (const entry of entries) {
 			if (entry.name.startsWith('.')) continue
@@ -324,6 +544,7 @@ export function scanLibrary(downloadLocation: string, force = false): LibraryDat
 
 				if (AUDIO_EXTS.has(ext)) {
 					musicFiles.push(fullPath)
+					localAudio.push(fullPath)
 				} else if (IMAGE_EXTS.has(ext)) {
 					const lowerName = entry.name.toLowerCase()
 					if (COVER_FILENAMES.includes(lowerName) && !foundCover) {
@@ -335,7 +556,24 @@ export function scanLibrary(downloadLocation: string, force = false): LibraryDat
 			}
 		}
 
-		const coverPath = foundCover || firstImage
+		if (localAudio.length > 0) {
+			dirAudioFiles.set(currentDir, localAudio)
+		}
+
+		let coverPath = foundCover || firstImage
+
+		// If no cover art file found in folder, attempt to extract embedded picture from first audio file
+		if (!coverPath && localAudio.length > 0) {
+			for (let i = 0; i < Math.min(localAudio.length, 3); i++) {
+				const extracted = extractEmbeddedCover(localAudio[i], currentDir)
+				if (extracted) {
+					coverPath = extracted
+					logger.info(`Extracted embedded cover art: ${path.relative(resolvedBase, extracted)}`)
+					break
+				}
+			}
+		}
+
 		if (coverPath) {
 			const relDir = path.relative(resolvedBase, currentDir) || '.'
 			dirCoverMap.set(relDir, path.relative(resolvedBase, coverPath))
@@ -494,6 +732,44 @@ export function scanLibrary(downloadLocation: string, force = false): LibraryDat
 		}
 	}
 
+	// For albums that still have no cover art, query Deezer Search API in parallel (concurrency limit 4)
+	const missingCoverAlbums: {
+		albumObj: { title: string; artist: string; cover: string; path: string; tracks: TrackMetadata[] }
+		fullDir: string
+		relDir: string
+	}[] = []
+
+	for (const [, artistObj] of artistsMap) {
+		for (const [, albumObj] of artistObj.albumsMap) {
+			if (!albumObj.cover && albumObj.path && albumObj.path !== '.') {
+				const fullDir = path.resolve(resolvedBase, albumObj.path)
+				missingCoverAlbums.push({ albumObj, fullDir, relDir: albumObj.path })
+			}
+		}
+	}
+
+	if (missingCoverAlbums.length > 0) {
+		const CONCURRENCY = 4
+		for (let i = 0; i < missingCoverAlbums.length; i += CONCURRENCY) {
+			const batch = missingCoverAlbums.slice(i, i + CONCURRENCY)
+			await Promise.all(
+				batch.map(async ({ albumObj, fullDir, relDir }) => {
+					try {
+						const savedCover = await fetchDeezerAlbumCover(albumObj.artist, albumObj.title, fullDir)
+						if (savedCover) {
+							const relCover = path.relative(resolvedBase, savedCover)
+							dirCoverMap.set(relDir, relCover)
+							albumObj.cover = `api/getLibraryCover?path=${encodeURIComponent(relCover)}`
+							logger.info(`Fetched Deezer HD cover for ${albumObj.artist} - ${albumObj.title}`)
+						}
+					} catch {
+						// Ignore network errors during cover art fetch
+					}
+				})
+			)
+		}
+	}
+
 	// Build structured response
 	let totalAlbums = 0
 	const artists: ArtistMetadata[] = []
@@ -550,10 +826,10 @@ export function scanLibrary(downloadLocation: string, force = false): LibraryDat
 	return libraryData
 }
 
-export function deleteLibraryTrack(
+export async function deleteLibraryTrack(
 	relTrackPath: string,
 	downloadLocation: string
-): { success: boolean; error?: string; library?: LibraryData } {
+): Promise<{ success: boolean; error?: string; library?: LibraryData }> {
 	const resolvedBase = path.resolve(downloadLocation)
 	const fullPath = path.resolve(resolvedBase, relTrackPath)
 
@@ -572,14 +848,14 @@ export function deleteLibraryTrack(
 	}
 
 	// Rescan incrementally to rebuild clean state and remove empty folders/albums
-	const updatedLibrary = scanLibrary(downloadLocation)
+	const updatedLibrary = await scanLibrary(downloadLocation)
 	return { success: true, library: updatedLibrary }
 }
 
-export function deleteLibraryAlbum(
+export async function deleteLibraryAlbum(
 	relAlbumPath: string,
 	downloadLocation: string
-): { success: boolean; error?: string; library?: LibraryData } {
+): Promise<{ success: boolean; error?: string; library?: LibraryData }> {
 	const resolvedBase = path.resolve(downloadLocation)
 	const fullAlbumPath = path.resolve(resolvedBase, relAlbumPath)
 
@@ -598,6 +874,6 @@ export function deleteLibraryAlbum(
 	}
 
 	// Rescan incrementally to rebuild clean state
-	const updatedLibrary = scanLibrary(downloadLocation)
+	const updatedLibrary = await scanLibrary(downloadLocation)
 	return { success: true, library: updatedLibrary }
 }
