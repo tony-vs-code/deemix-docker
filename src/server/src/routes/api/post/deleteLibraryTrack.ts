@@ -4,7 +4,7 @@ import { deleteLibraryTrack } from '../../../helpers/libraryDb'
 
 const pathEndpoint: ApiHandler['path'] = '/deleteLibraryTrack'
 
-const handler: ApiHandler['handler'] = (req, res) => {
+const handler: ApiHandler['handler'] = async (req, res) => {
 	try {
 		const deemix = req.app.get('deemix')
 		const settings = deemix?.getSettings()?.settings || deemix?.settings || {}
@@ -15,7 +15,7 @@ const handler: ApiHandler['handler'] = (req, res) => {
 			return res.status(400).send({ success: false, error: 'Missing trackPath parameter' })
 		}
 
-		const result = deleteLibraryTrack(trackPath, downloadLocation)
+		const result = await deleteLibraryTrack(trackPath, downloadLocation)
 		if (!result.success) {
 			return res.status(400).send({ success: false, error: result.error })
 		}

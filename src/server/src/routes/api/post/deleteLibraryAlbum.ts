@@ -4,7 +4,7 @@ import { deleteLibraryAlbum } from '../../../helpers/libraryDb'
 
 const pathEndpoint: ApiHandler['path'] = '/deleteLibraryAlbum'
 
-const handler: ApiHandler['handler'] = (req, res) => {
+const handler: ApiHandler['handler'] = async (req, res) => {
 	try {
 		const deemix = req.app.get('deemix')
 		const settings = deemix?.getSettings()?.settings || deemix?.settings || {}
@@ -15,7 +15,7 @@ const handler: ApiHandler['handler'] = (req, res) => {
 			return res.status(400).send({ success: false, error: 'Missing albumPath parameter' })
 		}
 
-		const result = deleteLibraryAlbum(albumPath, downloadLocation)
+		const result = await deleteLibraryAlbum(albumPath, downloadLocation)
 		if (!result.success) {
 			return res.status(400).send({ success: false, error: result.error })
 		}

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.16] - 2026-11-15
+
+### Added
+- **Audio Streaming & In-App Music Player**: Added `/api/streamLibraryTrack` endpoint supporting HTTP 206 Partial Content Range requests with zero-latency seeking. Built a docked floating audio player bar with play/pause, time/duration scrubber, volume slider, mute toggle, format badge, previous/next track queue navigation, row-level play buttons, and animated equalizer bars.
+- **Automated Album Art Extraction & Deezer HD Fallback**: Automatic extraction of embedded ID3v2 `APIC` (MP3) and `METADATA_BLOCK_PICTURE` (FLAC) artwork saved directly to `cover.jpg` in each album directory. Albums without embedded art automatically query Deezer Search API with a concurrent pool to download crystal-clear 1000x1000 HD `cover_xl` artwork.
+- **Library Virtualization & Track Pagination**: Added fast pagination for tracks (50 per page with selector for 25, 50, 100, 250) and albums (48 per page). Pre-flattened artist/album structures in memory and replaced slow ICU `localeCompare` with `fastCompare` to eliminate DOM overload and render 3,000+ tracks in <3ms without freezing the browser.
+
+### Fixed
+- **Sidebar Downloads Badge Phantom Count**: Resolved issue where the downloads badge showed 92 active items despite an empty queue. Replaced legacy regex status matching with strict finished-state verification against `['completed', 'withErrors', 'failed', 'download finished']` and tied active counts directly to `queueOrder` and current downloading job.
+- **UI Freeze on Tab Switching**: Fixed main thread lockups when switching between the Tracks tab and Downloads tab by isolating track sorting to active tab views and optimizing Vue reactivity.
+- **Filesystem Permission Safety in Cover Extraction**: Wrapped cover stream creation in immediate error listeners and try/catch blocks to ensure read-only or permission-restricted folders (`EACCES`) fail gracefully without crashing the server.
+
 ## [2026.11.15] - 2026-11-15
 
 ### Added

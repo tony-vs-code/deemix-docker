@@ -160,7 +160,7 @@
 				class="albums-grid"
 			>
 				<div
-					v-for="album in filteredAlbums"
+					v-for="album in paginatedAlbums"
 					:key="album.path || `${album.artist}-${album.title}`"
 					class="album-card group"
 					@click="openAlbumModal(album)"
@@ -247,7 +247,7 @@
 						</thead>
 						<tbody>
 							<tr
-								v-for="album in filteredAlbums"
+								v-for="album in paginatedAlbums"
 								:key="album.path || `${album.artist}-${album.title}`"
 								class="track-row album-list-row"
 								@click="openAlbumModal(album)"
@@ -298,8 +298,34 @@
 				</div>
 			</div>
 
+			<!-- Album Pagination Bar -->
+			<div v-if="filteredAlbums.length > albumPageSize" class="pagination-bar">
+				<div class="pagination-left">
+					<span class="page-range-text">
+						Showing {{ ((albumCurrentPage - 1) * albumPageSize) + 1 }} - {{ Math.min(albumCurrentPage * albumPageSize, filteredAlbums.length) }} of {{ filteredAlbums.length.toLocaleString() }} albums
+					</span>
+				</div>
+				<div class="pagination-controls">
+					<button class="page-btn" :disabled="albumCurrentPage <= 1" title="First Page" @click="albumCurrentPage = 1">
+						<i class="material-icons">first_page</i>
+					</button>
+					<button class="page-btn" :disabled="albumCurrentPage <= 1" title="Previous Page" @click="albumCurrentPage--">
+						<i class="material-icons">chevron_left</i>
+					</button>
+					<span class="page-info">
+						Page {{ albumCurrentPage }} of {{ totalAlbumPages }}
+					</span>
+					<button class="page-btn" :disabled="albumCurrentPage >= totalAlbumPages" title="Next Page" @click="albumCurrentPage++">
+						<i class="material-icons">chevron_right</i>
+					</button>
+					<button class="page-btn" :disabled="albumCurrentPage >= totalAlbumPages" title="Last Page" @click="albumCurrentPage = totalAlbumPages">
+						<i class="material-icons">last_page</i>
+					</button>
+				</div>
+			</div>
+
 			<!-- Empty State -->
-			<div v-else class="empty-state-card">
+			<div v-if="filteredAlbums.length === 0" class="empty-state-card">
 				<div class="empty-icon-box">
 					<i class="material-icons empty-icon">{{ searchQuery ? 'search_off' : 'library_music' }}</i>
 				</div>
@@ -384,12 +410,29 @@
 						</thead>
 						<tbody>
 							<tr
-								v-for="(track, index) in filteredTracks"
+								v-for="(track, index) in paginatedTracks"
 								:key="track.path || `${track.title}-${index}`"
-								class="track-row"
+								class="track-row track-playable-row"
+								:class="{ 'row-is-playing': isCurrentTrack(track) }"
+								@click="playTrack(track, filteredTracks)"
 							>
 								<td class="col-num track-num-cell">
-									{{ track.trackNumber || (index + 1) }}
+									<div class="track-num-wrapper">
+										<span v-if="!isCurrentTrack(track)" class="track-num-text">
+											{{ track.trackNumber || (((trackCurrentPage - 1) * trackPageSize) + index + 1) }}
+										</span>
+										<div v-else-if="isPlaying" class="playing-equalizer-icon" title="Playing">
+											<span></span><span></span><span></span>
+										</div>
+										<i v-else class="material-icons play-status-icon">pause</i>
+										<button
+											class="row-play-btn"
+											:title="isCurrentTrack(track) && isPlaying ? 'Pause' : 'Play'"
+											@click.stop="playTrack(track, filteredTracks)"
+										>
+											<i class="material-icons">{{ isCurrentTrack(track) && isPlaying ? 'pause' : 'play_arrow' }}</i>
+										</button>
+									</div>
 								</td>
 								<td class="col-title track-title-cell">
 									<div class="track-title-text" :title="track.title">
@@ -417,7 +460,7 @@
 								<td class="col-size track-size-cell">
 									{{ track.formattedSize }}
 								</td>
-								<td class="col-actions track-actions-cell">
+								<td class="col-actions track-actions-cell" @click.stop>
 									<button
 										class="track-delete-btn"
 										:title="$t('libraryPage.deleteTrack')"
@@ -429,6 +472,39 @@
 							</tr>
 						</tbody>
 					</table>
+				</div>
+
+				<!-- Tracks Pagination Bar -->
+				<div class="pagination-bar">
+					<div class="pagination-left">
+						<span class="page-size-label">Rows:</span>
+						<select v-model.number="trackPageSize" class="page-size-select" @change="trackCurrentPage = 1">
+							<option :value="25">25</option>
+							<option :value="50">50</option>
+							<option :value="100">100</option>
+							<option :value="250">250</option>
+						</select>
+						<span class="page-range-text">
+							Showing {{ ((trackCurrentPage - 1) * trackPageSize) + 1 }} - {{ Math.min(trackCurrentPage * trackPageSize, filteredTracks.length) }} of {{ filteredTracks.length.toLocaleString() }} tracks
+						</span>
+					</div>
+					<div class="pagination-controls">
+						<button class="page-btn" :disabled="trackCurrentPage <= 1" title="First Page" @click="trackCurrentPage = 1">
+							<i class="material-icons">first_page</i>
+						</button>
+						<button class="page-btn" :disabled="trackCurrentPage <= 1" title="Previous Page" @click="trackCurrentPage--">
+							<i class="material-icons">chevron_left</i>
+						</button>
+						<span class="page-info">
+							Page {{ trackCurrentPage }} of {{ totalTrackPages }}
+						</span>
+						<button class="page-btn" :disabled="trackCurrentPage >= totalTrackPages" title="Next Page" @click="trackCurrentPage++">
+							<i class="material-icons">chevron_right</i>
+						</button>
+						<button class="page-btn" :disabled="trackCurrentPage >= totalTrackPages" title="Last Page" @click="trackCurrentPage = totalTrackPages">
+							<i class="material-icons">last_page</i>
+						</button>
+					</div>
 				</div>
 			</div>
 
@@ -530,10 +606,27 @@
 								<tr
 									v-for="(track, index) in selectedAlbum.tracks"
 									:key="track.path || `${track.title}-${index}`"
-									class="track-row"
+									class="track-row track-playable-row"
+									:class="{ 'row-is-playing': isCurrentTrack(track) }"
+									@click="playTrack(track, selectedAlbum.tracks)"
 								>
 									<td class="col-num track-num-cell">
-										{{ track.trackNumber || (index + 1) }}
+										<div class="track-num-wrapper">
+											<span v-if="!isCurrentTrack(track)" class="track-num-text">
+												{{ track.trackNumber || (index + 1) }}
+											</span>
+											<div v-else-if="isPlaying" class="playing-equalizer-icon" title="Playing">
+												<span></span><span></span><span></span>
+											</div>
+											<i v-else class="material-icons play-status-icon">pause</i>
+											<button
+												class="row-play-btn"
+												:title="isCurrentTrack(track) && isPlaying ? 'Pause' : 'Play'"
+												@click.stop="playTrack(track, selectedAlbum.tracks)"
+											>
+												<i class="material-icons">{{ isCurrentTrack(track) && isPlaying ? 'pause' : 'play_arrow' }}</i>
+											</button>
+										</div>
 									</td>
 									<td class="col-title track-title-cell">
 										<div class="track-title-text" :title="track.title">
@@ -554,7 +647,7 @@
 									<td class="col-size track-size-cell">
 										{{ track.formattedSize }}
 									</td>
-									<td class="col-actions track-actions-cell">
+									<td class="col-actions track-actions-cell" @click.stop>
 										<button
 											class="track-delete-btn"
 											:title="$t('libraryPage.deleteTrack')"
@@ -618,12 +711,120 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Floating Audio Player Bar -->
+		<div v-if="currentTrack" class="floating-audio-player">
+			<!-- Hidden native audio element -->
+			<audio
+				ref="audioPlayer"
+				:src="audioStreamUrl"
+				preload="auto"
+				@play="onAudioPlay"
+				@pause="onAudioPause"
+				@timeupdate="onAudioTimeUpdate"
+				@loadedmetadata="onAudioLoadedMetadata"
+				@ended="onAudioEnded"
+				@error="onAudioError"
+			></audio>
+
+			<!-- Left Track Info -->
+			<div class="player-track-info">
+				<div class="player-cover-box">
+					<img
+						v-if="currentTrackCover"
+						:src="getCoverUrl(currentTrackCover)"
+						:alt="currentTrack.title"
+						class="player-cover-img"
+					/>
+					<i v-else class="material-icons player-cover-placeholder">audiotrack</i>
+				</div>
+				<div class="player-meta">
+					<div class="player-title" :title="currentTrack.title">
+						{{ currentTrack.title }}
+					</div>
+					<div class="player-artist" :title="currentTrack.artist">
+						{{ currentTrack.artist }} &bull; {{ currentTrack.album || currentTrack.albumTitle || 'Album' }}
+					</div>
+				</div>
+			</div>
+
+			<!-- Center Controls + Scrubber -->
+			<div class="player-controls-center">
+				<div class="player-buttons-row">
+					<button
+						class="player-btn player-nav-btn"
+						:disabled="!hasPreviousTrack"
+						title="Previous Track"
+						@click="playPreviousTrack"
+					>
+						<i class="material-icons">skip_previous</i>
+					</button>
+					<button
+						class="player-btn player-btn-main"
+						:title="isPlaying ? 'Pause' : 'Play'"
+						@click="togglePlayPause"
+					>
+						<i class="material-icons">{{ isPlaying ? 'pause' : 'play_arrow' }}</i>
+					</button>
+					<button
+						class="player-btn player-nav-btn"
+						:disabled="!hasNextTrack"
+						title="Next Track"
+						@click="playNextTrack"
+					>
+						<i class="material-icons">skip_next</i>
+					</button>
+				</div>
+
+				<div class="player-scrubber-row">
+					<span class="player-time-label">{{ formatDuration(audioCurrentTime) }}</span>
+					<input
+						type="range"
+						min="0"
+						:max="audioDuration || 100"
+						step="0.5"
+						:value="audioCurrentTime"
+						class="player-slider scrubber-slider"
+						@input="onSeekInput"
+					/>
+					<span class="player-time-label">{{ formatDuration(audioDuration) }}</span>
+				</div>
+			</div>
+
+			<!-- Right Volume + Format + Close -->
+			<div class="player-actions-right">
+				<span class="format-pill mr-2" :class="formatPillClass(currentTrack.format)">
+					{{ (currentTrack.format || 'MP3').toUpperCase() }}
+				</span>
+				<button class="player-btn player-mute-btn" :title="isMuted ? 'Unmute' : 'Mute'" @click="toggleMute">
+					<i class="material-icons">{{ isMuted || audioVolume === 0 ? 'volume_off' : (audioVolume < 0.5 ? 'volume_down' : 'volume_up') }}</i>
+				</button>
+				<input
+					type="range"
+					min="0"
+					max="1"
+					step="0.05"
+					:value="isMuted ? 0 : audioVolume"
+					class="player-slider volume-slider"
+					@input="onVolumeInput"
+				/>
+				<button class="player-btn player-close-btn ml-2" title="Close Player" @click="closePlayer">
+					<i class="material-icons">close</i>
+				</button>
+			</div>
+		</div>
 	</div>
 </template>
 
 <script>
 import { fetchData, postToServer } from '@/utils/api'
 import { socket } from '@/utils/socket'
+
+function fastCompare(a, b) {
+	const s1 = (a || '').toLowerCase()
+	const s2 = (b || '').toLowerCase()
+	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0
+}
 
 export default {
 	name: 'Library',
@@ -642,7 +843,35 @@ export default {
 			totalArtists: 0,
 			searchQuery: '',
 			selectedAlbum: null,
-			pendingDelete: null
+			pendingDelete: null,
+			albumCurrentPage: 1,
+			albumPageSize: 48,
+			trackCurrentPage: 1,
+			trackPageSize: 50,
+			currentTrack: null,
+			isPlaying: false,
+			audioCurrentTime: 0,
+			audioDuration: 0,
+			audioVolume: 0.8,
+			isMuted: false,
+			playbackQueue: [],
+			queueIndex: -1,
+			cachedAlbums: [],
+			cachedTracks: []
+		}
+	},
+	watch: {
+		searchQuery() {
+			this.albumCurrentPage = 1
+			this.trackCurrentPage = 1
+		},
+		sortBy() {
+			this.albumCurrentPage = 1
+			this.trackCurrentPage = 1
+		},
+		activeView() {
+			this.albumCurrentPage = 1
+			this.trackCurrentPage = 1
 		}
 	},
 	computed: {
@@ -651,19 +880,40 @@ export default {
 			if (this.activeView === 'tracks') return 'Search tracks, artists, or albums...'
 			return 'Search albums by title or artist...'
 		},
+		totalAlbumPages() {
+			return Math.ceil(this.filteredAlbums.length / this.albumPageSize) || 1
+		},
+		paginatedAlbums() {
+			const start = (this.albumCurrentPage - 1) * this.albumPageSize
+			return this.filteredAlbums.slice(start, start + this.albumPageSize)
+		},
+		totalTrackPages() {
+			return Math.ceil(this.filteredTracks.length / this.trackPageSize) || 1
+		},
+		paginatedTracks() {
+			const start = (this.trackCurrentPage - 1) * this.trackPageSize
+			return this.filteredTracks.slice(start, start + this.trackPageSize)
+		},
+		audioStreamUrl() {
+			if (!this.currentTrack || !this.currentTrack.path) return ''
+			const base = location.base.endsWith('/') ? location.base : `${location.base}/`
+			return `${base}api/streamLibraryTrack?path=${encodeURIComponent(this.currentTrack.path)}`
+		},
+		currentTrackCover() {
+			if (!this.currentTrack) return ''
+			return this.currentTrack.albumCover || (this.selectedAlbum && this.selectedAlbum.cover) || ''
+		},
+		hasPreviousTrack() {
+			return this.playbackQueue.length > 1 && (this.queueIndex > 0 || this.audioCurrentTime > 3)
+		},
+		hasNextTrack() {
+			return this.playbackQueue.length > 1 && this.queueIndex < this.playbackQueue.length - 1
+		},
 		allAlbums() {
-			const albums = []
-			this.artists.forEach(artist => {
-				if (Array.isArray(artist.albums)) {
-					artist.albums.forEach(album => {
-						albums.push(album)
-					})
-				}
-			})
-			return albums
+			return this.cachedAlbums
 		},
 		filteredAlbums() {
-			let albums = [...this.allAlbums]
+			let albums = this.cachedAlbums
 			if (this.searchQuery.trim()) {
 				const query = this.searchQuery.toLowerCase().trim()
 				albums = albums.filter(album => {
@@ -671,14 +921,16 @@ export default {
 					const artistMatch = (album.artist || '').toLowerCase().includes(query)
 					return titleMatch || artistMatch
 				})
+			} else {
+				albums = [...albums]
 			}
 
 			switch (this.sortBy) {
 				case 'title_desc':
-					albums.sort((a, b) => (b.title || '').localeCompare(a.title || ''))
+					albums.sort((a, b) => fastCompare(b.title, a.title))
 					break
 				case 'artist_asc':
-					albums.sort((a, b) => (a.artist || '').localeCompare(b.artist || '') || (a.title || '').localeCompare(b.title || ''))
+					albums.sort((a, b) => fastCompare(a.artist, b.artist) || fastCompare(a.title, b.title))
 					break
 				case 'tracks_desc':
 					albums.sort((a, b) => (b.tracksCount || 0) - (a.tracksCount || 0))
@@ -688,28 +940,17 @@ export default {
 					break
 				case 'title_asc':
 				default:
-					albums.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+					albums.sort((a, b) => fastCompare(a.title, b.title))
 					break
 			}
 			return albums
 		},
 		allTracks() {
-			const tracks = []
-			this.allAlbums.forEach(album => {
-				if (Array.isArray(album.tracks)) {
-					album.tracks.forEach(track => {
-						tracks.push({
-							...track,
-							albumTitle: album.title,
-							albumCover: album.cover
-						})
-					})
-				}
-			})
-			return tracks
+			return this.cachedTracks
 		},
 		filteredTracks() {
-			let tracks = [...this.allTracks]
+			if (this.activeView !== 'tracks') return []
+			let tracks = this.cachedTracks
 			if (this.searchQuery.trim()) {
 				const q = this.searchQuery.toLowerCase().trim()
 				tracks = tracks.filter(
@@ -719,21 +960,23 @@ export default {
 						(t.album || '').toLowerCase().includes(q) ||
 						(t.albumTitle || '').toLowerCase().includes(q)
 				)
+			} else {
+				tracks = [...tracks]
 			}
 
 			switch (this.sortBy) {
 				case 'title_desc':
-					tracks.sort((a, b) => (b.title || '').localeCompare(a.title || ''))
+					tracks.sort((a, b) => fastCompare(b.title, a.title))
 					break
 				case 'artist_asc':
-					tracks.sort((a, b) => (a.artist || '').localeCompare(b.artist || '') || (a.title || '').localeCompare(b.title || ''))
+					tracks.sort((a, b) => fastCompare(a.artist, b.artist) || fastCompare(a.title, b.title))
 					break
 				case 'size_desc':
 					tracks.sort((a, b) => (b.size || 0) - (a.size || 0))
 					break
 				case 'title_asc':
 				default:
-					tracks.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+					tracks.sort((a, b) => fastCompare(a.title, b.title))
 					break
 			}
 			return tracks
@@ -747,7 +990,7 @@ export default {
 
 			switch (this.sortBy) {
 				case 'title_desc':
-					artists.sort((a, b) => (b.name || '').localeCompare(a.name || ''))
+					artists.sort((a, b) => fastCompare(b.name, a.name))
 					break
 				case 'tracks_desc':
 					artists.sort((a, b) => (b.totalTracks || 0) - (a.totalTracks || 0))
@@ -756,7 +999,7 @@ export default {
 				case 'title_asc':
 				case 'artist_asc':
 				default:
-					artists.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+					artists.sort((a, b) => fastCompare(a.name, b.name))
 					break
 			}
 			return artists
@@ -781,8 +1024,137 @@ export default {
 	destroyed() {
 		socket.off('libraryUpdated', this.handleLibraryUpdated)
 		document.removeEventListener('keydown', this.handleKeyDown)
+		if (this.$refs.audioPlayer) {
+			this.$refs.audioPlayer.pause()
+		}
 	},
 	methods: {
+		isCurrentTrack(track) {
+			return !!(this.currentTrack && track && this.currentTrack.path === track.path)
+		},
+		playTrack(track, queue = []) {
+			if (this.currentTrack && this.currentTrack.path === track.path) {
+				this.togglePlayPause()
+				return
+			}
+			this.currentTrack = track
+			if (queue && queue.length > 0) {
+				this.playbackQueue = queue
+				this.queueIndex = queue.findIndex(t => t.path === track.path)
+			} else {
+				this.playbackQueue = [track]
+				this.queueIndex = 0
+			}
+			this.audioCurrentTime = 0
+			this.$nextTick(() => {
+				const audio = this.$refs.audioPlayer
+				if (audio) {
+					audio.load()
+					audio.volume = this.isMuted ? 0 : this.audioVolume
+					audio.play().catch(e => {
+						console.warn('Playback error or autoplay blocked:', e)
+					})
+				}
+			})
+		},
+		togglePlayPause() {
+			const audio = this.$refs.audioPlayer
+			if (!audio) return
+			if (this.isPlaying) {
+				audio.pause()
+			} else {
+				audio.play().catch(e => console.warn('Play error:', e))
+			}
+		},
+		playNextTrack() {
+			if (this.queueIndex >= 0 && this.queueIndex < this.playbackQueue.length - 1) {
+				this.queueIndex++
+				const nextTrack = this.playbackQueue[this.queueIndex]
+				this.playTrack(nextTrack, this.playbackQueue)
+			}
+		},
+		playPreviousTrack() {
+			if (this.audioCurrentTime > 3) {
+				const audio = this.$refs.audioPlayer
+				if (audio) audio.currentTime = 0
+				return
+			}
+			if (this.queueIndex > 0) {
+				this.queueIndex--
+				const prevTrack = this.playbackQueue[this.queueIndex]
+				this.playTrack(prevTrack, this.playbackQueue)
+			}
+		},
+		onAudioPlay() {
+			this.isPlaying = true
+		},
+		onAudioPause() {
+			this.isPlaying = false
+		},
+		onAudioTimeUpdate() {
+			const audio = this.$refs.audioPlayer
+			if (audio) {
+				this.audioCurrentTime = audio.currentTime
+			}
+		},
+		onAudioLoadedMetadata() {
+			const audio = this.$refs.audioPlayer
+			if (audio) {
+				this.audioDuration = audio.duration || 0
+			}
+		},
+		onAudioEnded() {
+			if (this.hasNextTrack) {
+				this.playNextTrack()
+			} else {
+				this.isPlaying = false
+			}
+		},
+		onAudioError(e) {
+			console.error('Audio playback error:', e)
+			this.isPlaying = false
+		},
+		onSeekInput(event) {
+			const newTime = parseFloat(event.target.value)
+			this.audioCurrentTime = newTime
+			const audio = this.$refs.audioPlayer
+			if (audio) {
+				audio.currentTime = newTime
+			}
+		},
+		onVolumeInput(event) {
+			const vol = parseFloat(event.target.value)
+			this.audioVolume = vol
+			this.isMuted = vol === 0
+			const audio = this.$refs.audioPlayer
+			if (audio) {
+				audio.volume = vol
+			}
+		},
+		toggleMute() {
+			this.isMuted = !this.isMuted
+			const audio = this.$refs.audioPlayer
+			if (audio) {
+				audio.volume = this.isMuted ? 0 : this.audioVolume
+			}
+		},
+		closePlayer() {
+			const audio = this.$refs.audioPlayer
+			if (audio) {
+				audio.pause()
+			}
+			this.isPlaying = false
+			this.currentTrack = null
+			this.playbackQueue = []
+			this.queueIndex = -1
+		},
+		formatDuration(seconds) {
+			if (!seconds || isNaN(seconds) || seconds < 0) return '0:00'
+			const s = Math.floor(seconds)
+			const mins = Math.floor(s / 60)
+			const rem = s % 60
+			return `${mins}:${rem < 10 ? '0' : ''}${rem}`
+		},
 		getAlbumFormat(album) {
 			if (!album.tracks || album.tracks.length === 0) return 'MP3'
 			return (album.tracks[0].format || 'MP3').toUpperCase()
@@ -795,6 +1167,27 @@ export default {
 			this.totalTracks = data.totalTracks || 0
 			this.totalAlbums = data.totalAlbums || 0
 			this.totalArtists = data.totalArtists || 0
+
+			const albums = []
+			const tracks = []
+			;(data.artists || []).forEach(artist => {
+				if (Array.isArray(artist.albums)) {
+					artist.albums.forEach(album => {
+						albums.push(album)
+						if (Array.isArray(album.tracks)) {
+							album.tracks.forEach(track => {
+								tracks.push({
+									...track,
+									albumTitle: album.title,
+									albumCover: album.cover
+								})
+							})
+						}
+					})
+				}
+			})
+			this.cachedAlbums = albums
+			this.cachedTracks = tracks
 
 			// Refresh selectedAlbum reference if modal is open
 			if (this.selectedAlbum) {
@@ -912,6 +1305,17 @@ export default {
 				} else if (this.selectedAlbum) {
 					this.closeAlbumModal()
 				}
+			} else if (
+				event.code === 'Space' &&
+				event.target &&
+				event.target.tagName !== 'INPUT' &&
+				event.target.tagName !== 'SELECT' &&
+				event.target.tagName !== 'TEXTAREA'
+			) {
+				if (this.currentTrack) {
+					event.preventDefault()
+					this.togglePlayPause()
+				}
 			}
 		},
 		formatPillClass(format) {
@@ -927,7 +1331,7 @@ export default {
 <style scoped>
 .library-page {
 	width: 100%;
-	padding: 1.5rem 0 3rem 0;
+	padding: 1.5rem 0 6.5rem 0;
 }
 
 /* Page Header */
@@ -2188,5 +2592,461 @@ export default {
 
 .confirm-delete-btn:hover:not(:disabled) {
 	background: #e11d48;
+}
+
+/* Pagination Bar */
+.pagination-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 1rem;
+	padding: 1rem 0.5rem;
+	margin-top: 1rem;
+	border-top: 1px solid var(--border-color);
+}
+
+.pagination-left {
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+	color: var(--secondary-text);
+	font-size: 0.8125rem;
+}
+
+.page-size-label {
+	font-weight: 500;
+}
+
+.page-size-select {
+	background: var(--card-background);
+	border: 1px solid var(--border-color);
+	color: var(--foreground);
+	padding: 0.25rem 0.5rem;
+	border-radius: 0.5rem;
+	font-size: 0.8125rem;
+	font-weight: 600;
+	cursor: pointer;
+	outline: none;
+}
+
+.page-size-select:focus {
+	border-color: var(--primary-color);
+}
+
+.page-range-text {
+	font-family: monospace;
+	font-size: 0.8125rem;
+	color: var(--secondary-text);
+}
+
+.pagination-controls {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.page-btn {
+	background: var(--card-background);
+	border: 1px solid var(--border-color);
+	color: var(--foreground);
+	width: 2.2rem;
+	height: 2.2rem;
+	border-radius: 0.5rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+	background: rgba(6, 182, 212, 0.15);
+	border-color: var(--primary-color);
+	color: var(--primary-color);
+}
+
+.page-btn:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+}
+
+.page-info {
+	font-size: 0.8125rem;
+	font-weight: 600;
+	color: var(--foreground);
+	padding: 0 0.5rem;
+}
+
+/* Playable Row Styling */
+.track-playable-row {
+	cursor: pointer;
+	user-select: none;
+	transition: background-color 0.15s ease;
+}
+
+.track-playable-row:hover {
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.row-is-playing {
+	background: rgba(6, 182, 212, 0.12) !important;
+	border-left: 3px solid var(--primary-color, #06b6d4);
+}
+
+.row-is-playing .track-title-text {
+	color: var(--primary-color, #06b6d4) !important;
+	font-weight: 700;
+}
+
+.track-num-wrapper {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	margin: 0 auto;
+}
+
+.track-num-text {
+	font-size: 0.8125rem;
+	color: var(--secondary-text);
+	font-family: monospace;
+}
+
+.row-play-btn {
+	display: none;
+	background: transparent;
+	border: none;
+	color: var(--primary-color);
+	cursor: pointer;
+	padding: 0;
+	width: 1.75rem;
+	height: 1.75rem;
+	align-items: center;
+	justify-content: center;
+}
+
+.track-playable-row:hover .track-num-text {
+	display: none;
+}
+
+.track-playable-row:hover .row-play-btn {
+	display: flex;
+}
+
+.track-playable-row:hover .playing-equalizer-icon {
+	display: none;
+}
+
+.play-status-icon {
+	font-size: 1.15rem;
+	color: var(--primary-color);
+}
+
+/* Equalizer Bars Animation */
+.playing-equalizer-icon {
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	gap: 2px;
+	width: 1rem;
+	height: 1rem;
+}
+
+.playing-equalizer-icon span {
+	width: 3px;
+	background: var(--primary-color, #06b6d4);
+	border-radius: 1px;
+	animation: eqBounce 0.9s infinite ease-in-out;
+}
+
+.playing-equalizer-icon span:nth-child(1) {
+	height: 50%;
+	animation-delay: 0.2s;
+}
+
+.playing-equalizer-icon span:nth-child(2) {
+	height: 100%;
+	animation-delay: 0.4s;
+}
+
+.playing-equalizer-icon span:nth-child(3) {
+	height: 65%;
+	animation-delay: 0.1s;
+}
+
+@keyframes eqBounce {
+	0%, 100% { height: 25%; }
+	50% { height: 100%; }
+}
+
+/* Floating Audio Player Bar */
+.floating-audio-player {
+	position: fixed;
+	bottom: 1.25rem;
+	left: 50%;
+	transform: translateX(-50%);
+	width: calc(100% - 2.5rem);
+	max-width: 62rem;
+	background: rgba(15, 23, 42, 0.94);
+	backdrop-filter: blur(20px);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.85), 0 0 30px rgba(6, 182, 212, 0.2);
+	border-radius: 1.25rem;
+	padding: 0.75rem 1.25rem;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1.5rem;
+	z-index: 99999;
+	animation: slideUpPlayer 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUpPlayer {
+	from {
+		opacity: 0;
+		transform: translate(-50%, 25px);
+	}
+	to {
+		opacity: 1;
+		transform: translate(-50%, 0);
+	}
+}
+
+/* Player Left: Track info */
+.player-track-info {
+	display: flex;
+	align-items: center;
+	gap: 0.85rem;
+	min-width: 14rem;
+	max-width: 20rem;
+	flex-shrink: 0;
+}
+
+.player-cover-box {
+	width: 3.25rem;
+	height: 3.25rem;
+	border-radius: 0.65rem;
+	overflow: hidden;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.player-cover-img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.player-cover-placeholder {
+	font-size: 1.75rem;
+	color: var(--secondary-text);
+}
+
+.player-meta {
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+}
+
+.player-title {
+	font-size: 0.875rem;
+	font-weight: 700;
+	color: var(--foreground);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.player-artist {
+	font-size: 0.75rem;
+	color: var(--secondary-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Player Center: Controls + Scrubber */
+.player-controls-center {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.4rem;
+	flex: 1;
+	max-width: 32rem;
+}
+
+.player-buttons-row {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.player-btn {
+	background: transparent;
+	border: none;
+	color: var(--foreground);
+	cursor: pointer;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.15s ease;
+	border-radius: 9999px;
+}
+
+.player-nav-btn {
+	width: 2rem;
+	height: 2rem;
+	color: var(--secondary-text);
+}
+
+.player-nav-btn:hover:not(:disabled) {
+	color: var(--foreground);
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.player-nav-btn:disabled {
+	opacity: 0.3;
+	cursor: not-allowed;
+}
+
+.player-btn-main {
+	width: 2.6rem;
+	height: 2.6rem;
+	background: var(--primary-color, #06b6d4);
+	color: #0f172a;
+	box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+}
+
+.player-btn-main:hover {
+	transform: scale(1.08);
+	background: #22d3ee;
+}
+
+.player-btn-main i {
+	font-size: 1.6rem;
+}
+
+.player-scrubber-row {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	width: 100%;
+}
+
+.player-time-label {
+	font-size: 0.75rem;
+	font-family: monospace;
+	color: var(--secondary-text);
+	min-width: 2.5rem;
+	text-align: center;
+}
+
+/* Custom Sliders */
+.player-slider {
+	-webkit-appearance: none;
+	appearance: none;
+	background: rgba(255, 255, 255, 0.15);
+	border-radius: 9999px;
+	height: 4px;
+	outline: none;
+	cursor: pointer;
+	transition: height 0.15s ease;
+}
+
+.player-slider:hover {
+	height: 6px;
+}
+
+.scrubber-slider {
+	flex: 1;
+}
+
+.volume-slider {
+	width: 5.5rem;
+}
+
+.player-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: var(--primary-color, #06b6d4);
+	cursor: pointer;
+	box-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
+	transition: transform 0.15s ease;
+}
+
+.player-slider::-webkit-slider-thumb:hover {
+	transform: scale(1.25);
+}
+
+.player-slider::-moz-range-thumb {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: var(--primary-color, #06b6d4);
+	cursor: pointer;
+	border: none;
+	box-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
+}
+
+/* Player Right: Volume + Close */
+.player-actions-right {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	min-width: 11rem;
+	justify-content: flex-end;
+	flex-shrink: 0;
+}
+
+.player-mute-btn {
+	width: 2rem;
+	height: 2rem;
+	color: var(--secondary-text);
+}
+
+.player-mute-btn:hover {
+	color: var(--foreground);
+}
+
+.player-close-btn {
+	width: 2rem;
+	height: 2rem;
+	color: var(--secondary-text);
+	border-radius: 0.5rem;
+}
+
+.player-close-btn:hover {
+	color: #f43f5e;
+	background: rgba(244, 63, 94, 0.15);
+}
+
+@media (max-width: 768px) {
+	.floating-audio-player {
+		bottom: 0.75rem;
+		width: calc(100% - 1rem);
+		padding: 0.65rem 0.85rem;
+		gap: 0.75rem;
+	}
+
+	.player-actions-right {
+		display: none;
+	}
+
+	.player-track-info {
+		min-width: 0;
+		max-width: 9rem;
+	}
 }
 </style>

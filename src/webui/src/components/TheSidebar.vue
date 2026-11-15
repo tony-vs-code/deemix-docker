@@ -93,13 +93,29 @@ export default defineComponent({
 
 		// Active downloads tracker for the badge
 		const queueList = ref({})
+		const queueOrder = ref([])
+		const currentUuid = ref(null)
+
+		const isFinished = item => {
+			if (!item) return true
+			return (
+				['completed', 'withErrors', 'failed', 'download finished'].includes(item.status) ||
+				(item.size > 0 && (item.downloaded || 0) + (item.failed || 0) >= item.size)
+			)
+		}
 
 		const isDownloading = item => {
-			return item && (item.status === 'downloading' || item.status === 'converting' || (item.progress > 0 && item.progress < 100 && item.status !== 'download finished'))
+			if (!item || isFinished(item)) return false
+			return item.status === 'downloading' || item.status === 'converting' || currentUuid.value === item.uuid
+		}
+
+		const isQueued = item => {
+			if (!item || isFinished(item) || isDownloading(item)) return false
+			return item.status === 'inQueue' || queueOrder.value.includes(item.uuid)
 		}
 
 		const downloadingCount = computed(() => {
-			return Object.values(queueList.value).filter(isDownloading).length
+			return Object.values(queueList.value).filter(item => isDownloading(item) || isQueued(item)).length
 		})
 
 		const updateItem = (uuid, data) => {
@@ -120,30 +136,41 @@ export default defineComponent({
 				...queueList.value,
 				[item.uuid]: item
 			}
+			if (item.uuid && !queueOrder.value.includes(item.uuid)) {
+				queueOrder.value.push(item.uuid)
+			}
 		}
 
 		const handleStartDownload = uuid => {
+			currentUuid.value = uuid
 			updateItem(uuid, { status: 'downloading' })
+			queueOrder.value = queueOrder.value.filter(u => u !== uuid)
 		}
 
 		const handleFinishDownload = uuid => {
+			if (currentUuid.value === uuid) currentUuid.value = null
 			updateItem(uuid, { status: 'download finished' })
+			queueOrder.value = queueOrder.value.filter(u => u !== uuid)
 		}
 
 		const handleRemoveFromQueue = uuid => {
+			if (currentUuid.value === uuid) currentUuid.value = null
+			queueOrder.value = queueOrder.value.filter(u => u !== uuid)
 			const updated = { ...queueList.value }
 			delete updated[uuid]
 			queueList.value = updated
 		}
 
 		const handleRemoveAllDownloads = () => {
+			currentUuid.value = null
+			queueOrder.value = []
 			queueList.value = {}
 		}
 
 		const handleRemoveFinishedDownloads = () => {
 			const updated = { ...queueList.value }
 			Object.keys(updated).forEach(uuid => {
-				if (updated[uuid].status === 'download finished') {
+				if (isFinished(updated[uuid])) {
 					delete updated[uuid]
 				}
 			})
@@ -160,8 +187,12 @@ export default defineComponent({
 
 			try {
 				const queueData = await fetchData('getQueue')
-				if (queueData && queueData.queue) {
-					queueList.value = queueData.queue
+				if (queueData) {
+					if (queueData.queue) queueList.value = queueData.queue
+					if (Array.isArray(queueData.queueOrder)) queueOrder.value = queueData.queueOrder
+					if (queueData.current && queueData.current.uuid) {
+						currentUuid.value = queueData.current.uuid
+					}
 				}
 			} catch (e) {
 				// socket will handle subsequent updates
