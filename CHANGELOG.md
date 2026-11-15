@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.18] - 2026-11-15
+
+### Fixed
+- Library Page Navigation Lockup — resolved VNode duplicate key collisions for download root items and eliminated computed object reference churn, enabling instantaneous stat card switching (Albums, Artists, Tracks) and page navigation during active search queries.
+
+### Added
+- Modernized Settings Page — complete visual overhaul of the Settings page matching the glassmorphic dark theme of Library and Downloads, with modern headers, glass cards, refined inputs, custom toggles, an elevated profile card, an interactive language flag grid, and a sticky save bar.
+
 ## [2026.11.17] - 2026-11-15
 
 ### Added
