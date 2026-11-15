@@ -325,7 +325,7 @@
 			</div>
 
 			<!-- Empty State -->
-			<div v-else class="empty-state-card">
+			<div v-if="filteredAlbums.length === 0" class="empty-state-card">
 				<div class="empty-icon-box">
 					<i class="material-icons empty-icon">{{ searchQuery ? 'search_off' : 'library_music' }}</i>
 				</div>
