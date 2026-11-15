@@ -9,19 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Modern App Icon & Favicons**: Created squircle dark-mode app icon (`assets/icon.jpg`) and multi-size browser tab favicons (`favicon.ico`, `favicon-32x32.png`, `apple-touch-icon.png`).
-- **Dedicated Downloads Queue Tab**: Added a dedicated "Queued" filter tab, stat cards, and unified active queue monitoring on the Downloads page.
+- **Unified Queue View**: Merged downloading and queued items into a single unified "Queue" tab with overview stat cards for Downloading and Queued counts.
 - **Build Caching**: Added [.dockerignore](file:///home/anthony/projects/deemix-docker/.dockerignore) reducing build context transfer from 265MB to ~110KB (99.96% reduction).
 - **Dependency Patch Automation**: Automated postinstall patching (`src/scripts/patch-dependencies.js`) for upstream libraries during build.
 
 ### Changed
 - **Base Image Upgrade**: Migrated from deprecated `lsiobase/alpine:3.15` to current `lscr.io/linuxserver/baseimage-alpine:3.20`.
 - **Fast Layered Builds**: Separated dependency installation from source code compilation in `Dockerfile` with BuildKit yarn/apt cache mounts, reducing incremental rebuild times to ~2 seconds.
+- **Settings Pruning**: Removed obsolete settings including "Slim download tab" and "Automatically Check for Updates".
 
 ### Removed
-- **Link Analyzer**: Removed redundant Link Analyzer route and view to streamline the app focus strictly on music downloading and local library management.
+- **Link Analyzer**: Removed redundant Link Analyzer route, sidebar entry, and view to streamline the app focus strictly on music library management and downloads.
+- **"All" Downloads Tab**: Removed the redundant "All" tab from the Downloads page in favor of the unified "Queue", "Completed", and "Failed" views.
 
 ### Fixed
 - **Playlist Download Crash (`HREF`)**: Fixed `Cannot read properties of undefined (reading 'HREF')` in `deezer-js` when handling tracks with regional restrictions or missing 30-second audio previews.
+- **Translation Display**: Fixed missing translation keys for Downloading and Queued stat counters on the Downloads page.
 
 ## [2026.11.14] - 2026-11-14
 
