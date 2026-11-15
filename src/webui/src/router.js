@@ -8,7 +8,6 @@ import Artist from '@components/pages/Artist.vue'
 import Charts from '@components/pages/Charts.vue'
 import Errors from '@components/pages/Errors.vue'
 import Home from '@components/pages/Home.vue'
-import LinkAnalyzer from '@components/pages/LinkAnalyzer.vue'
 import Search from '@components/pages/Search.vue'
 import Settings from '@components/pages/Settings.vue'
 import Tracklist from '@components/pages/Tracklist.vue'
@@ -85,11 +84,6 @@ const routes = [
 		path: '/errors',
 		name: 'Errors',
 		component: Errors
-	},
-	{
-		path: '/link-analyzer',
-		name: 'Link Analyzer',
-		component: LinkAnalyzer
 	},
 	{
 		path: '/info-arl',

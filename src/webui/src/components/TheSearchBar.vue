@@ -129,7 +129,6 @@ export default defineComponent({
 		},
 		async performSearch(term, modifierKey) {
 			const isSearchingURL = isValidURL(term)
-			const isShowingAnalyzer = this.$route.name === 'Link Analyzer'
 			const isShowingSearch = this.$route.name === 'Search'
 			const isSameAsLastSearch = term === this.lastTextSearch
 
@@ -137,30 +136,6 @@ export default defineComponent({
 				if (modifierKey) {
 					this.$root.$emit('ContextMenu:searchbar', term)
 					return
-				}
-
-				if (isShowingAnalyzer) {
-					try {
-						const analyzedData = await fetchData('analyzeLink', { term })
-						const isError = !!analyzedData.errorCode
-
-						if (isError) {
-							EventBus.$emit('analyze_notSupported', analyzedData)
-							return
-						}
-
-						if (analyzedData.type === 'track') {
-							EventBus.$emit('analyze_track', analyzedData)
-						}
-
-						if (analyzedData.type === 'album') {
-							EventBus.$emit('analyze_album', analyzedData)
-						}
-						return
-					} catch (error) {
-						console.error(error)
-						return
-					}
 				}
 
 				sendAddToQueue(term)

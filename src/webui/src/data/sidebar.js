@@ -35,13 +35,6 @@ export const links = [
 		label: 'sidebar.library'
 	},
 	{
-		name: 'analyzer',
-		ariaLabel: 'link analyzer',
-		routerName: 'Link Analyzer',
-		icon: 'link',
-		label: 'sidebar.linkAnalyzer'
-	},
-	{
 		name: 'settings',
 		ariaLabel: 'settings',
 		routerName: 'Settings',

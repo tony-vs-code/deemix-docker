@@ -520,8 +520,9 @@ const en = {
 		retry: 'Retry Download',
 		remove: 'Remove from Queue',
 		tabs: {
-			all: 'All',
+			queue: 'Queue',
 			downloading: 'Downloading',
+			queued: 'Queued',
 			completed: 'Completed',
 			failed: 'Failed'
 		},
@@ -533,10 +534,8 @@ const en = {
 			queued: 'Queued'
 		},
 		empty: {
-			allTitle: 'No Downloads in Queue',
-			allMessage: 'Your download queue is currently empty. Search for tracks, albums, or playlists to download music.',
-			downloadingTitle: 'No Active Downloads',
-			downloadingMessage: 'There are no active downloads currently running.',
+			queueTitle: 'Queue is Empty',
+			queueMessage: 'No active or queued downloads right now. Search for music or albums to start downloading.',
 			completedTitle: 'No Completed Downloads',
 			completedMessage: 'Completed downloads will appear here once finished.',
 			failedTitle: 'No Failed Downloads',
@@ -547,6 +546,17 @@ const en = {
 		title: 'Library Manager',
 		downloadPath: 'Download Folder',
 		scanLibrary: 'Scan Library',
+		rescanLibrary: 'Rescan Library',
+		lastScanned: 'Last Updated',
+		deleteAlbum: 'Delete Album',
+		deleteTrack: 'Delete Track',
+		deleting: 'Deleting...',
+		confirmDeleteAlbumTitle: 'Delete Album From Disk',
+		confirmDeleteAlbumMessage: 'Are you sure you want to permanently delete "{title}" and all of its audio files from your hard drive? This cannot be undone.',
+		confirmDeleteTrackTitle: 'Delete Track From Disk',
+		confirmDeleteTrackMessage: 'Are you sure you want to permanently delete "{title}" from your hard drive? This cannot be undone.',
+		deletePermanently: 'Permanently Delete',
+		cancel: 'Cancel',
 		scanning: 'Scanning...',
 		scanningLibrary: 'Scanning music library...',
 		scanningDescription: 'Reading audio files and metadata from your download directory.',
@@ -565,7 +575,8 @@ const en = {
 			title: 'Title',
 			artist: 'Artist',
 			format: 'Format',
-			size: 'Size'
+			size: 'Size',
+			actions: 'Actions'
 		},
 		empty: {
 			emptyTitle: 'Music Library Is Empty',

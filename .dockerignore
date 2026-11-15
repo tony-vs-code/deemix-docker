@@ -1,0 +1,11 @@
+.git
+.github
+.agents
+agents
+**/node_modules
+**/dist
+/config
+/downloads
+*.log
+*.tmp
+.DS_Store

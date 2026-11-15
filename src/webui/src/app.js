@@ -131,12 +131,8 @@ document.addEventListener('paste', pasteEvent => {
 	let pastedText = pasteEvent.clipboardData.getData('Text')
 
 	if (isValidURL(pastedText)) {
-		if (router.currentRoute.name === 'Link Analyzer') {
-			socket.emit('analyzeLink', pastedText)
-		} else {
-			if (pastedText.includes('\n')) pastedText = pastedText.replace(/\n/g, ';')
-			sendAddToQueue(pastedText)
-		}
+		if (pastedText.includes('\n')) pastedText = pastedText.replace(/\n/g, ';')
+		sendAddToQueue(pastedText)
 	} else {
 		const searchbar = document.querySelector('#searchbar')
 		searchbar.select()

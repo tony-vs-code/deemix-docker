@@ -102,10 +102,6 @@
 				</h3>
 			</template>
 
-			<label class="with-checkbox">
-				<input v-model="modelSlimDownloads" type="checkbox" />
-				<span class="checkbox-text">{{ $t('settings.appearance.slimDownloadTab') }}</span>
-			</label>
 			<label class="mb-4 with-checkbox">
 				<input v-model="modelSlimSidebar" type="checkbox" />
 				<span class="checkbox-text">{{ $t('settings.appearance.slimSidebar') }}</span>
@@ -542,11 +538,6 @@
 			<template #title>
 				<h3 class="settings-group__header"><i class="material-icons">list</i>{{ $t('settings.other.title') }}</h3>
 			</template>
-
-			<label class="with-checkbox">
-				<input v-model="settings.autoCheckForUpdates" type="checkbox" />
-				<span class="checkbox-text">{{ $t('settings.other.autoCheckForUpdates') }}</span>
-			</label>
 
 			<label class="with-checkbox">
 				<input v-model="settings.tags.savePlaylistAsCompilation" type="checkbox" />

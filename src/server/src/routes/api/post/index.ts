@@ -8,6 +8,9 @@ import removeFromQueue from './removeFromQueue'
 import logout from './logout'
 import saveSettings from './saveSettings'
 import retryDownload from './retryDownload'
+import scanLibrary from './scanLibrary'
+import deleteLibraryTrack from './deleteLibraryTrack'
+import deleteLibraryAlbum from './deleteLibraryAlbum'
 
 export default [
 	changeAccount,
@@ -19,5 +22,8 @@ export default [
 	removeFromQueue,
 	logout,
 	saveSettings,
-	retryDownload
+	retryDownload,
+	scanLibrary,
+	deleteLibraryTrack,
+	deleteLibraryAlbum
 ]

@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.15] - 2026-11-15
+
+### Added
+- **Persistent Library Database**: Integrated a JSON-backed database in `/config/library.json` with memory caching and `mtime` incremental scanning, providing instant library loading (<2ms) and eliminating redundant disk scans.
+- **Library Record Management & File Deletion**: Added ability to permanently delete albums and individual tracks directly from the UI with disk cleanup, path traversal security checks, and confirmation dialogs.
+- **Auto-Indexing on Download Completion**: Background incremental scanning automatically indexes newly downloaded songs into the database upon completion and broadcasts real-time updates over WebSockets (`libraryUpdated`).
+- **Modern App Icon & Favicons**: Created squircle dark-mode app icon (`assets/icon.jpg`) and multi-size browser tab favicons (`favicon.ico`, `favicon-32x32.png`, `apple-touch-icon.png`).
+- **Unified Queue View**: Merged downloading and queued items into a single unified "Queue" tab with overview stat cards for Downloading and Queued counts.
+- **Build Caching**: Added [.dockerignore](file:///home/anthony/projects/deemix-docker/.dockerignore) reducing build context transfer from 265MB to ~110KB (99.96% reduction).
+- **Dependency Patch Automation**: Automated postinstall patching (`src/scripts/patch-dependencies.js`) for upstream libraries during build.
+
+### Changed
+- **Integrated Interactive Stat Filters**: Converted the top overview stat cards on both the Downloads and Library pages into direct interactive filter buttons with live counts, eliminating duplicate tab bars and selectors across the application.
+- **Reworked Library Layout**: Introduced a Unified Media Toolbar with real-time search, multi-field sorting (A-Z, Artist, Track Count, Size), Grid/List view switcher, and modern square media cards with floating format and quick delete badges.
+- **Base Image Upgrade**: Migrated from deprecated `lsiobase/alpine:3.15` to current `lscr.io/linuxserver/baseimage-alpine:3.20`.
+- **Fast Layered Builds**: Separated dependency installation from source code compilation in `Dockerfile` with BuildKit yarn/apt cache mounts, reducing incremental rebuild times to ~2 seconds.
+- **Settings Pruning**: Removed obsolete settings including "Slim download tab" and "Automatically Check for Updates".
+
+### Removed
+- **Link Analyzer**: Removed redundant Link Analyzer route, sidebar entry, and view to streamline the app focus strictly on music library management and downloads.
+- **"All" Downloads Tab**: Removed the redundant "All" tab from the Downloads page in favor of the unified "Queue", "Completed", and "Failed" views.
+
+### Fixed
+- **Playlist Download Crash (`HREF`)**: Fixed `Cannot read properties of undefined (reading 'HREF')` in `deezer-js` when handling tracks with regional restrictions or missing 30-second audio previews.
+- **Translation Display**: Fixed missing translation keys for Downloading and Queued stat counters on the Downloads page.
+
 ## [2026.11.14] - 2026-11-14
 
 ### Added
