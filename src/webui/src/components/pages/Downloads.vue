@@ -53,6 +53,14 @@
 				<div class="stat-value text-cyan">{{ downloadingCount }}</div>
 			</div>
 
+			<div class="stat-card stat-queued">
+				<div class="stat-header">
+					<span class="stat-label text-amber">{{ $t('downloadsPage.tabs.queued') }}</span>
+					<i class="material-icons stat-icon text-amber">hourglass_top</i>
+				</div>
+				<div class="stat-value text-amber">{{ queuedCount }}</div>
+			</div>
+
 			<div class="stat-card stat-completed">
 				<div class="stat-header">
 					<span class="stat-label text-emerald">{{ $t('downloadsPage.tabs.completed') }}</span>
@@ -237,6 +245,9 @@ export default {
 		downloadingCount() {
 			return this.itemsArray.filter(this.isDownloading).length
 		},
+		queuedCount() {
+			return this.itemsArray.filter(this.isQueued).length
+		},
 		completedCount() {
 			return this.itemsArray.filter(this.isCompleted).length
 		},
@@ -247,6 +258,7 @@ export default {
 			return [
 				{ id: 'all', label: this.$t('downloadsPage.tabs.all'), count: this.totalCount, badgeClass: 'badge-muted' },
 				{ id: 'downloading', label: this.$t('downloadsPage.tabs.downloading'), count: this.downloadingCount, badgeClass: 'badge-cyan' },
+				{ id: 'queued', label: this.$t('downloadsPage.tabs.queued'), count: this.queuedCount, badgeClass: 'badge-amber' },
 				{ id: 'completed', label: this.$t('downloadsPage.tabs.completed'), count: this.completedCount, badgeClass: 'badge-emerald' },
 				{ id: 'failed', label: this.$t('downloadsPage.tabs.failed'), count: this.failedCount, badgeClass: 'badge-rose' }
 			]
@@ -254,7 +266,9 @@ export default {
 		filteredItems() {
 			switch (this.activeFilter) {
 				case 'downloading':
-					return this.itemsArray.filter(this.isDownloading)
+					return this.itemsArray.filter(item => this.isDownloading(item) || this.isQueued(item))
+				case 'queued':
+					return this.itemsArray.filter(this.isQueued)
 				case 'completed':
 					return this.itemsArray.filter(this.isCompleted)
 				case 'failed':
@@ -268,6 +282,8 @@ export default {
 			switch (this.activeFilter) {
 				case 'downloading':
 					return 'file_download_done'
+				case 'queued':
+					return 'hourglass_empty'
 				case 'completed':
 					return 'done_all'
 				case 'failed':
@@ -281,6 +297,8 @@ export default {
 			switch (this.activeFilter) {
 				case 'downloading':
 					return this.$t('downloadsPage.empty.downloadingTitle')
+				case 'queued':
+					return this.$t('downloadsPage.empty.queuedTitle')
 				case 'completed':
 					return this.$t('downloadsPage.empty.completedTitle')
 				case 'failed':
@@ -294,6 +312,8 @@ export default {
 			switch (this.activeFilter) {
 				case 'downloading':
 					return this.$t('downloadsPage.empty.downloadingMessage')
+				case 'queued':
+					return this.$t('downloadsPage.empty.queuedMessage')
 				case 'completed':
 					return this.$t('downloadsPage.empty.completedMessage')
 				case 'failed':
@@ -496,6 +516,9 @@ export default {
 		isFailed(item) {
 			return item && (item.status === 'failed' || (item.failed > 0) || (item.errors && item.errors.length > 0) || (item.status === 'download finished' && item.size > 0 && item.failed === item.size))
 		},
+		isQueued(item) {
+			return item && !this.isCompleted(item) && !this.isFailed(item) && !this.isDownloading(item)
+		},
 		calculateProgress(item) {
 			if (!item) return 0
 			if (item.status === 'download finished') return 100
@@ -635,7 +658,7 @@ export default {
 
 @media (min-width: 640px) {
 	.stats-grid {
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 	}
 }
 
@@ -761,6 +784,15 @@ export default {
 .badge-cyan {
 	background: rgba(6, 182, 212, 0.2);
 	color: #06b6d4;
+}
+
+.badge-amber {
+	background: rgba(245, 158, 11, 0.2);
+	color: #f59e0b;
+}
+
+.text-amber {
+	color: #f59e0b;
 }
 
 .badge-emerald {
@@ -1002,8 +1034,9 @@ export default {
 }
 
 .status-badge-queued {
-	background: var(--border-color);
-	color: var(--secondary-text);
+	background: rgba(245, 158, 11, 0.15);
+	color: #f59e0b;
+	border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 /* Error Alert */

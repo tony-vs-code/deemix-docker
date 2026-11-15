@@ -522,6 +522,7 @@ const en = {
 		tabs: {
 			all: 'All',
 			downloading: 'Downloading',
+			queued: 'Queued',
 			completed: 'Completed',
 			failed: 'Failed'
 		},
@@ -537,6 +538,8 @@ const en = {
 			allMessage: 'Your download queue is currently empty. Search for tracks, albums, or playlists to download music.',
 			downloadingTitle: 'No Active Downloads',
 			downloadingMessage: 'There are no active downloads currently running.',
+			queuedTitle: 'No Queued Downloads',
+			queuedMessage: 'All items in your queue have finished or are actively downloading.',
 			completedTitle: 'No Completed Downloads',
 			completedMessage: 'Completed downloads will appear here once finished.',
 			failedTitle: 'No Failed Downloads',
