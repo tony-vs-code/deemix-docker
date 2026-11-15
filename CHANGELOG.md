@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.19] - 2026-11-15
+
+### Fixed
+- Git-less Version Fallback — fixed `src/scripts/gen-version.js` to discover repository `version` files when `.git` is excluded during container builds, preventing git command errors and eliminating the legacy `2022.12.14` fallback.
+- Dockerfile `cp` Error — eliminated failing `cp "${BIN_PATH}" /deemix-server` command by utilizing `pkg --output /deemix-server` directly.
+- Startup Redirects — fixed Deezer connectivity check in `root/etc/cont-init.d/15-checks` to follow HTTPS redirects (`curl -sfL`).
+
+### Changed
+- Build Pipeline Acceleration — refactored `Dockerfile` into a multi-stage architecture with a platform-independent `bundler` stage on `$BUILDPLATFORM` that compiles Webpack and Rollup bundles once for all target architectures, cutting build times significantly.
+- Root Package Manifest — added root `package.json` with standard build, test, lint, and preview scripts to eliminate root directory `ENOENT` command errors.
+- GitHub Actions — upgraded to `docker/build-push-action@v6`, passed `BUILDDATE` build argument, and enabled `provenance: false`.
+
 ## [2026.11.18] - 2026-11-15
 
 ### Fixed
