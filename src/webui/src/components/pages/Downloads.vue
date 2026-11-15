@@ -35,60 +35,66 @@
 			</div>
 		</div>
 
-		<!-- Stats Overview Cards -->
+		<!-- Interactive Stat Filter Cards with Totals -->
 		<div class="stats-grid">
-			<div class="stat-card">
+			<button
+				class="stat-card"
+				:class="{ 'stat-card-active active-queue': activeFilter === 'queue' }"
+				@click="activeFilter = 'queue'"
+			>
 				<div class="stat-header">
 					<span class="stat-label">{{ $t('downloadsPage.tabs.queue') }}</span>
 					<i class="material-icons stat-icon">queue_music</i>
 				</div>
 				<div class="stat-value">{{ queueCount }}</div>
-			</div>
+			</button>
 
-			<div class="stat-card stat-downloading">
+			<button
+				class="stat-card stat-downloading"
+				:class="{ 'stat-card-active active-downloading': activeFilter === 'downloading' }"
+				@click="activeFilter = 'downloading'"
+			>
 				<div class="stat-header">
 					<span class="stat-label text-cyan">{{ $t('downloadsPage.status.downloading') }}</span>
 					<i class="material-icons stat-icon text-cyan" :class="{ 'spin-slow': downloadingCount > 0 }">downloading</i>
 				</div>
 				<div class="stat-value text-cyan">{{ downloadingCount }}</div>
-			</div>
+			</button>
 
-			<div class="stat-card stat-queued">
+			<button
+				class="stat-card stat-queued"
+				:class="{ 'stat-card-active active-queued': activeFilter === 'queued' }"
+				@click="activeFilter = 'queued'"
+			>
 				<div class="stat-header">
 					<span class="stat-label text-amber">{{ $t('downloadsPage.status.queued') }}</span>
 					<i class="material-icons stat-icon text-amber">hourglass_top</i>
 				</div>
 				<div class="stat-value text-amber">{{ queuedCount }}</div>
-			</div>
+			</button>
 
-			<div class="stat-card stat-completed">
+			<button
+				class="stat-card stat-completed"
+				:class="{ 'stat-card-active active-completed': activeFilter === 'completed' }"
+				@click="activeFilter = 'completed'"
+			>
 				<div class="stat-header">
 					<span class="stat-label text-emerald">{{ $t('downloadsPage.tabs.completed') }}</span>
 					<i class="material-icons stat-icon text-emerald">check_circle</i>
 				</div>
 				<div class="stat-value text-emerald">{{ completedCount }}</div>
-			</div>
+			</button>
 
-			<div class="stat-card stat-failed">
+			<button
+				class="stat-card stat-failed"
+				:class="{ 'stat-card-active active-failed': activeFilter === 'failed' }"
+				@click="activeFilter = 'failed'"
+			>
 				<div class="stat-header">
 					<span class="stat-label text-rose">{{ $t('downloadsPage.tabs.failed') }}</span>
 					<i class="material-icons stat-icon text-rose">error_outline</i>
 				</div>
 				<div class="stat-value text-rose">{{ failedCount }}</div>
-			</div>
-		</div>
-
-		<!-- Filter Tabs Bar -->
-		<div class="filter-tabs-bar">
-			<button
-				v-for="tab in filterTabs"
-				:key="tab.id"
-				class="filter-pill"
-				:class="{ 'filter-pill-active': activeFilter === tab.id }"
-				@click="activeFilter = tab.id"
-			>
-				<span>{{ tab.label }}</span>
-				<span class="filter-badge" :class="tab.badgeClass">{{ tab.count }}</span>
 			</button>
 		</div>
 
@@ -257,15 +263,12 @@ export default {
 		failedCount() {
 			return this.itemsArray.filter(this.isFailed).length
 		},
-		filterTabs() {
-			return [
-				{ id: 'queue', label: this.$t('downloadsPage.tabs.queue'), count: this.queueCount, badgeClass: 'badge-cyan' },
-				{ id: 'completed', label: this.$t('downloadsPage.tabs.completed'), count: this.completedCount, badgeClass: 'badge-emerald' },
-				{ id: 'failed', label: this.$t('downloadsPage.tabs.failed'), count: this.failedCount, badgeClass: 'badge-rose' }
-			]
-		},
 		filteredItems() {
 			switch (this.activeFilter) {
+				case 'downloading':
+					return this.itemsArray.filter(this.isDownloading)
+				case 'queued':
+					return this.itemsArray.filter(this.isQueued)
 				case 'completed':
 					return this.itemsArray.filter(this.isCompleted)
 				case 'failed':
@@ -281,6 +284,10 @@ export default {
 					return 'done_all'
 				case 'failed':
 					return 'check_circle'
+				case 'downloading':
+					return 'downloading'
+				case 'queued':
+					return 'hourglass_empty'
 				case 'queue':
 				default:
 					return 'cloud_off'
@@ -292,6 +299,10 @@ export default {
 					return this.$t('downloadsPage.empty.completedTitle')
 				case 'failed':
 					return this.$t('downloadsPage.empty.failedTitle')
+				case 'downloading':
+					return 'No Active Downloads'
+				case 'queued':
+					return 'No Queued Downloads'
 				case 'queue':
 				default:
 					return this.$t('downloadsPage.empty.queueTitle')
@@ -303,6 +314,10 @@ export default {
 					return this.$t('downloadsPage.empty.completedMessage')
 				case 'failed':
 					return this.$t('downloadsPage.empty.failedMessage')
+				case 'downloading':
+					return 'There are no tracks currently downloading.'
+				case 'queued':
+					return 'There are no tracks waiting in the download queue.'
 				case 'queue':
 				default:
 					return this.$t('downloadsPage.empty.queueMessage')
@@ -652,21 +667,57 @@ export default {
 	border: 1px solid var(--border-color);
 	border-radius: 1rem;
 	padding: 1.25rem 1rem;
-	transition: all 0.2s ease;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 	position: relative;
 	overflow: hidden;
+	cursor: pointer;
+	text-align: left;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
 }
 
 .stat-card:hover {
 	border-color: var(--border-color-hover);
 	transform: translateY(-2px);
-	box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.2);
+	box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.25);
+}
+
+.stat-card-active {
+	border-color: var(--primary-color) !important;
+	background: rgba(var(--primary-color-rgb, 124, 58, 237), 0.1) !important;
+	box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb, 124, 58, 237), 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.3);
+}
+
+.stat-card-active.active-downloading {
+	border-color: #06b6d4 !important;
+	background: rgba(6, 182, 212, 0.1) !important;
+	box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.3);
+}
+
+.stat-card-active.active-queued {
+	border-color: #f59e0b !important;
+	background: rgba(245, 158, 11, 0.1) !important;
+	box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.3);
+}
+
+.stat-card-active.active-completed {
+	border-color: #10b981 !important;
+	background: rgba(16, 185, 129, 0.1) !important;
+	box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.3);
+}
+
+.stat-card-active.active-failed {
+	border-color: #f43f5e !important;
+	background: rgba(244, 63, 94, 0.1) !important;
+	box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.3);
 }
 
 .stat-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	width: 100%;
 }
 
 .stat-label {

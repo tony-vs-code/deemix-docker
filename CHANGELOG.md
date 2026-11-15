@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependency Patch Automation**: Automated postinstall patching (`src/scripts/patch-dependencies.js`) for upstream libraries during build.
 
 ### Changed
+- **Integrated Interactive Stat Filters**: Converted the top overview stat cards on both the Downloads and Library pages into direct interactive filter buttons with live counts, eliminating duplicate tab bars and selectors across the application.
 - **Base Image Upgrade**: Migrated from deprecated `lsiobase/alpine:3.15` to current `lscr.io/linuxserver/baseimage-alpine:3.20`.
 - **Fast Layered Builds**: Separated dependency installation from source code compilation in `Dockerfile` with BuildKit yarn/apt cache mounts, reducing incremental rebuild times to ~2 seconds.
 - **Settings Pruning**: Removed obsolete settings including "Slim download tab" and "Automatically Check for Updates".

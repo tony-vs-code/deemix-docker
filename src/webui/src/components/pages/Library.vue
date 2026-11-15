@@ -34,33 +34,45 @@
 			</div>
 		</div>
 
-		<!-- Stats Overview Cards -->
+		<!-- Interactive Stat Filter Buttons with Totals -->
 		<div class="stats-grid">
-			<div class="stat-card">
-				<div class="stat-header">
-					<span class="stat-label">{{ $t('libraryPage.stats.artists') }}</span>
-					<i class="material-icons stat-icon">person</i>
-				</div>
-				<div class="stat-value text-primary-val">{{ totalArtists }}</div>
-			</div>
-
-			<div class="stat-card">
+			<button
+				class="stat-card"
+				:class="{ 'stat-card-active active-albums': activeView === 'albums' }"
+				@click="activeView = 'albums'"
+			>
 				<div class="stat-header">
 					<span class="stat-label">{{ $t('libraryPage.stats.albums') }}</span>
 					<i class="material-icons stat-icon">album</i>
 				</div>
 				<div class="stat-value text-cyan-val">{{ totalAlbums }}</div>
-			</div>
+			</button>
 
-			<div class="stat-card">
+			<button
+				class="stat-card"
+				:class="{ 'stat-card-active active-artists': activeView === 'artists' }"
+				@click="activeView = 'artists'"
+			>
+				<div class="stat-header">
+					<span class="stat-label">{{ $t('libraryPage.stats.artists') }}</span>
+					<i class="material-icons stat-icon">person</i>
+				</div>
+				<div class="stat-value text-primary-val">{{ totalArtists }}</div>
+			</button>
+
+			<button
+				class="stat-card"
+				:class="{ 'stat-card-active active-tracks': activeView === 'tracks' }"
+				@click="activeView = 'tracks'"
+			>
 				<div class="stat-header">
 					<span class="stat-label">{{ $t('libraryPage.stats.tracks') }}</span>
 					<i class="material-icons stat-icon">audiotrack</i>
 				</div>
 				<div class="stat-value text-emerald-val">{{ totalTracks }}</div>
-			</div>
+			</button>
 
-			<div class="stat-card">
+			<div class="stat-card stat-summary-card">
 				<div class="stat-header">
 					<span class="stat-label">{{ $t('libraryPage.stats.totalSize') }}</span>
 					<i class="material-icons stat-icon">storage</i>
@@ -69,14 +81,14 @@
 			</div>
 		</div>
 
-		<!-- Search Bar & Filter Controls -->
+		<!-- Search Bar & Summary Row -->
 		<div class="search-filter-row">
 			<div class="search-box">
 				<i class="material-icons search-box-icon">search</i>
 				<input
 					v-model="searchQuery"
 					type="text"
-					:placeholder="$t('libraryPage.searchPlaceholder')"
+					:placeholder="searchPlaceholder"
 					class="search-box-input"
 				/>
 				<button
@@ -90,7 +102,15 @@
 			</div>
 
 			<div class="results-summary">
-				{{ $t('libraryPage.showingAlbums', { count: filteredAlbums.length, total: allAlbums.length }) }}
+				<span v-if="activeView === 'albums'">
+					{{ $t('libraryPage.showingAlbums', { count: filteredAlbums.length, total: allAlbums.length }) }}
+				</span>
+				<span v-else-if="activeView === 'artists'">
+					Showing {{ filteredArtists.length }} of {{ artists.length }} artists
+				</span>
+				<span v-else-if="activeView === 'tracks'">
+					Showing {{ filteredTracks.length }} of {{ allTracks.length }} tracks
+				</span>
 			</div>
 		</div>
 
@@ -103,9 +123,9 @@
 			<p class="scanning-subtitle">{{ $t('libraryPage.scanningDescription') }}</p>
 		</div>
 
-		<!-- Albums Card Grid -->
+		<!-- 1. ALBUMS VIEW -->
 		<div
-			v-else-if="filteredAlbums.length > 0"
+			v-else-if="activeView === 'albums' && filteredAlbums.length > 0"
 			class="albums-grid"
 		>
 			<div
@@ -162,6 +182,107 @@
 						</span>
 					</div>
 				</div>
+			</div>
+		</div>
+
+		<!-- 2. ARTISTS VIEW -->
+		<div
+			v-else-if="activeView === 'artists' && filteredArtists.length > 0"
+			class="artists-grid"
+		>
+			<div
+				v-for="artist in filteredArtists"
+				:key="artist.name"
+				class="artist-card"
+				@click="selectArtist(artist)"
+			>
+				<div class="artist-avatar-box">
+					<i class="material-icons artist-avatar-icon">person</i>
+				</div>
+				<div class="artist-info">
+					<h4 class="artist-name" :title="artist.name">{{ artist.name }}</h4>
+					<div class="artist-meta-badges">
+						<span class="badge-pill">
+							<i class="material-icons text-xs">album</i>
+							{{ artist.albumsCount }} {{ artist.albumsCount === 1 ? 'Album' : 'Albums' }}
+						</span>
+						<span class="badge-pill">
+							<i class="material-icons text-xs">audiotrack</i>
+							{{ artist.totalTracks }} {{ artist.totalTracks === 1 ? 'Track' : 'Tracks' }}
+						</span>
+					</div>
+				</div>
+				<div class="artist-arrow">
+					<i class="material-icons">chevron_right</i>
+				</div>
+			</div>
+		</div>
+
+		<!-- 3. ALL TRACKS VIEW -->
+		<div
+			v-else-if="activeView === 'tracks' && filteredTracks.length > 0"
+			class="tracks-view-container"
+		>
+			<div class="table-container">
+				<table class="tracks-table">
+					<thead>
+						<tr>
+							<th class="col-num">#</th>
+							<th class="col-title">{{ $t('libraryPage.table.title') }}</th>
+							<th class="col-artist">{{ $t('libraryPage.table.artist') }}</th>
+							<th class="col-album">Album</th>
+							<th class="col-format">{{ $t('libraryPage.table.format') }}</th>
+							<th class="col-size">{{ $t('libraryPage.table.size') }}</th>
+							<th class="col-actions">{{ $t('libraryPage.table.actions') }}</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr
+							v-for="(track, index) in filteredTracks"
+							:key="track.path || `${track.title}-${index}`"
+							class="track-row"
+						>
+							<td class="col-num track-num-cell">
+								{{ track.trackNumber || (index + 1) }}
+							</td>
+							<td class="col-title track-title-cell">
+								<div class="track-title-text" :title="track.title">
+									{{ track.title }}
+								</div>
+							</td>
+							<td class="col-artist track-artist-cell" :title="track.artist">
+								{{ track.artist }}
+							</td>
+							<td class="col-album track-album-cell">
+								<a
+									href="javascript:void(0)"
+									class="album-link"
+									:title="track.albumTitle || track.album"
+									@click.stop="openTrackAlbum(track)"
+								>
+									{{ track.albumTitle || track.album }}
+								</a>
+							</td>
+							<td class="col-format track-format-cell">
+								<span class="format-pill" :class="formatPillClass(track.format)">
+									{{ (track.format || 'MP3').toUpperCase() }}
+								</span>
+							</td>
+							<td class="col-size track-size-cell">
+								{{ track.formattedSize }}
+							</td>
+							<td class="col-actions track-actions-cell">
+								<button
+									class="track-delete-btn"
+									:title="$t('libraryPage.deleteTrack')"
+									@click.stop="confirmDeleteTrack(track)"
+								>
+									<i class="material-icons">delete_outline</i>
+								</button>
+							</td>
+						</tr>
+					</tbody>
+				</table>
 			</div>
 		</div>
 
@@ -374,6 +495,7 @@ export default {
 	name: 'Library',
 	data() {
 		return {
+			activeView: 'albums',
 			isScanning: false,
 			isDeleting: false,
 			downloadLocation: '',
@@ -388,6 +510,11 @@ export default {
 		}
 	},
 	computed: {
+		searchPlaceholder() {
+			if (this.activeView === 'artists') return 'Search artists...'
+			if (this.activeView === 'tracks') return 'Search tracks, artists, or albums...'
+			return this.$t('libraryPage.searchPlaceholder')
+		},
 		allAlbums() {
 			const albums = []
 			this.artists.forEach(artist => {
@@ -409,6 +536,37 @@ export default {
 				const artistMatch = (album.artist || '').toLowerCase().includes(query)
 				return titleMatch || artistMatch
 			})
+		},
+		allTracks() {
+			const tracks = []
+			this.allAlbums.forEach(album => {
+				if (Array.isArray(album.tracks)) {
+					album.tracks.forEach(track => {
+						tracks.push({
+							...track,
+							albumTitle: album.title,
+							albumCover: album.cover
+						})
+					})
+				}
+			})
+			return tracks
+		},
+		filteredTracks() {
+			if (!this.searchQuery.trim()) return this.allTracks
+			const q = this.searchQuery.toLowerCase().trim()
+			return this.allTracks.filter(
+				t =>
+					(t.title || '').toLowerCase().includes(q) ||
+					(t.artist || '').toLowerCase().includes(q) ||
+					(t.album || '').toLowerCase().includes(q) ||
+					(t.albumTitle || '').toLowerCase().includes(q)
+			)
+		},
+		filteredArtists() {
+			if (!this.searchQuery.trim()) return this.artists
+			const q = this.searchQuery.toLowerCase().trim()
+			return this.artists.filter(a => (a.name || '').toLowerCase().includes(q))
 		},
 		libraryTotalFormattedSize() {
 			let totalBytes = 0
@@ -481,6 +639,18 @@ export default {
 				this.applyLibraryData(updatedLib)
 			} else {
 				this.loadLibrary()
+			}
+		},
+		selectArtist(artist) {
+			this.searchQuery = artist.name
+			this.activeView = 'albums'
+		},
+		openTrackAlbum(track) {
+			const found = this.allAlbums.find(
+				a => (track.albumTitle && a.title === track.albumTitle) || (track.path && a.path === track.path.split('/')[0])
+			)
+			if (found) {
+				this.openAlbumModal(found)
 			}
 		},
 		confirmDeleteAlbum(album) {
@@ -660,7 +830,7 @@ export default {
 	to { transform: rotate(360deg); }
 }
 
-/* Stats Cards */
+/* Stats Cards as Buttons */
 .stats-grid {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -679,19 +849,61 @@ export default {
 	border: 1px solid var(--border-color);
 	border-radius: 1rem;
 	padding: 1.25rem 1rem;
-	transition: all 0.2s ease;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	position: relative;
+	overflow: hidden;
+	cursor: pointer;
+	text-align: left;
+	width: 100%;
+	display: flex;
+	flex-direction: column;
 }
 
 .stat-card:hover {
 	border-color: var(--border-color-hover);
 	transform: translateY(-2px);
-	box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.2);
+	box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.25);
+}
+
+.stat-card-active {
+	border-color: var(--primary-color) !important;
+	background: rgba(var(--primary-color-rgb, 124, 58, 237), 0.1) !important;
+	box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb, 124, 58, 237), 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.3);
+}
+
+.stat-card-active.active-albums {
+	border-color: #06b6d4 !important;
+	background: rgba(6, 182, 212, 0.1) !important;
+	box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.3);
+}
+
+.stat-card-active.active-artists {
+	border-color: var(--primary-color) !important;
+	background: rgba(var(--primary-color-rgb, 124, 58, 237), 0.1) !important;
+	box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb, 124, 58, 237), 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.3);
+}
+
+.stat-card-active.active-tracks {
+	border-color: #10b981 !important;
+	background: rgba(16, 185, 129, 0.1) !important;
+	box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.35), 0 10px 20px -5px rgba(0, 0, 0, 0.3);
+}
+
+.stat-summary-card {
+	cursor: default;
+}
+
+.stat-summary-card:hover {
+	transform: none;
+	border-color: var(--border-color);
+	box-shadow: none;
 }
 
 .stat-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	width: 100%;
 }
 
 .stat-label {
@@ -1015,6 +1227,135 @@ export default {
 	font-variant-numeric: tabular-nums;
 }
 
+/* Artists View */
+.artists-grid {
+	display: grid;
+	grid-template-columns: repeat(1, minmax(0, 1fr));
+	gap: 1rem;
+}
+
+@media (min-width: 640px) {
+	.artists-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (min-width: 1024px) {
+	.artists-grid {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+}
+
+.artist-card {
+	background: var(--card-background);
+	border: 1px solid var(--border-color);
+	border-radius: 1rem;
+	padding: 1.25rem 1rem;
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	cursor: pointer;
+	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.artist-card:hover {
+	border-color: var(--primary-color);
+	transform: translateY(-2px);
+	box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.25);
+}
+
+.artist-avatar-box {
+	width: 3.25rem;
+	height: 3.25rem;
+	border-radius: 9999px;
+	background: rgba(var(--primary-color-rgb, 124, 58, 237), 0.15);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.artist-avatar-icon {
+	font-size: 1.75rem;
+	color: var(--primary-color);
+}
+
+.artist-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.artist-name {
+	font-size: 1rem;
+	font-weight: 700;
+	color: var(--foreground);
+	margin: 0 0 0.35rem 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.artist-meta-badges {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.badge-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	color: var(--secondary-text);
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid var(--border-color);
+	padding: 0.15rem 0.45rem;
+	border-radius: 0.375rem;
+}
+
+.artist-arrow {
+	color: var(--secondary-text);
+	display: flex;
+	align-items: center;
+	transition: transform 0.2s ease;
+}
+
+.artist-card:hover .artist-arrow {
+	transform: translateX(4px);
+	color: var(--primary-color);
+}
+
+/* All Tracks View */
+.tracks-view-container {
+	width: 100%;
+}
+
+.col-album {
+	width: 25%;
+}
+
+.track-album-cell {
+	font-size: 0.8125rem;
+	color: var(--secondary-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 12rem;
+}
+
+.album-link {
+	color: var(--secondary-text);
+	text-decoration: none;
+	transition: color 0.15s ease;
+}
+
+.album-link:hover {
+	color: var(--primary-color);
+	text-decoration: underline;
+}
+
 /* Empty State */
 .empty-state-card {
 	padding: 5rem 1.5rem;
@@ -1321,7 +1662,7 @@ export default {
 }
 
 .col-artist {
-	width: 25%;
+	width: 20%;
 }
 
 .col-format {
