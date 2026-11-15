@@ -21,7 +21,7 @@
 				</div>
 			</div>
 
-			<!-- Scan / Rescan Button -->
+			<!-- Rescan Button -->
 			<div class="header-actions">
 				<button
 					class="btn btn-primary action-btn"
@@ -34,7 +34,7 @@
 			</div>
 		</div>
 
-		<!-- Interactive Stat Filter Buttons with Totals -->
+		<!-- Interactive Stat Filter Cards with Totals -->
 		<div class="stats-grid">
 			<button
 				class="stat-card"
@@ -81,8 +81,8 @@
 			</div>
 		</div>
 
-		<!-- Search Bar & Summary Row -->
-		<div class="search-filter-row">
+		<!-- Unified Media Toolbar: Search + Sort Dropdown + View Switcher + Counter -->
+		<div class="media-toolbar">
 			<div class="search-box">
 				<i class="material-icons search-box-icon">search</i>
 				<input
@@ -101,16 +101,45 @@
 				</button>
 			</div>
 
-			<div class="results-summary">
-				<span v-if="activeView === 'albums'">
-					{{ $t('libraryPage.showingAlbums', { count: filteredAlbums.length, total: allAlbums.length }) }}
-				</span>
-				<span v-else-if="activeView === 'artists'">
-					Showing {{ filteredArtists.length }} of {{ artists.length }} artists
-				</span>
-				<span v-else-if="activeView === 'tracks'">
-					Showing {{ filteredTracks.length }} of {{ allTracks.length }} tracks
-				</span>
+			<div class="toolbar-controls">
+				<!-- Sort Dropdown -->
+				<div class="sort-control">
+					<i class="material-icons sort-icon">sort</i>
+					<select v-model="sortBy" class="sort-select">
+						<option value="title_asc">Title (A - Z)</option>
+						<option value="title_desc">Title (Z - A)</option>
+						<option value="artist_asc">Artist (A - Z)</option>
+						<option value="tracks_desc">Most Tracks</option>
+						<option value="size_desc">Largest Size</option>
+					</select>
+				</div>
+
+				<!-- View Mode Switcher (Grid / List) for Albums -->
+				<div v-if="activeView === 'albums'" class="view-switcher">
+					<button
+						class="view-switch-btn"
+						:class="{ active: displayMode === 'grid' }"
+						title="Grid View"
+						@click="displayMode = 'grid'"
+					>
+						<i class="material-icons">grid_view</i>
+					</button>
+					<button
+						class="view-switch-btn"
+						:class="{ active: displayMode === 'list' }"
+						title="List View"
+						@click="displayMode = 'list'"
+					>
+						<i class="material-icons">view_list</i>
+					</button>
+				</div>
+
+				<!-- Results Count Badge -->
+				<div class="results-count-pill">
+					<span v-if="activeView === 'albums'">{{ filteredAlbums.length }} {{ filteredAlbums.length === 1 ? 'Album' : 'Albums' }}</span>
+					<span v-else-if="activeView === 'artists'">{{ filteredArtists.length }} {{ filteredArtists.length === 1 ? 'Artist' : 'Artists' }}</span>
+					<span v-else-if="activeView === 'tracks'">{{ filteredTracks.length }} {{ filteredTracks.length === 1 ? 'Track' : 'Tracks' }}</span>
+				</div>
 			</div>
 		</div>
 
@@ -124,188 +153,293 @@
 		</div>
 
 		<!-- 1. ALBUMS VIEW -->
-		<div
-			v-else-if="activeView === 'albums' && filteredAlbums.length > 0"
-			class="albums-grid"
-		>
+		<template v-else-if="activeView === 'albums'">
+			<!-- Grid Display Mode -->
 			<div
-				v-for="album in filteredAlbums"
-				:key="album.path || `${album.artist}-${album.title}`"
-				class="album-card group"
-				@click="openAlbumModal(album)"
+				v-if="displayMode === 'grid' && filteredAlbums.length > 0"
+				class="albums-grid"
 			>
-				<!-- Cover Art Container -->
-				<div class="album-cover-box">
-					<img
-						v-if="album.cover"
-						:src="getCoverUrl(album.cover)"
-						:alt="album.title"
-						class="album-img"
-						loading="lazy"
-					/>
-					<div v-else class="album-placeholder">
-						<i class="material-icons album-placeholder-icon">album</i>
-					</div>
-
-					<!-- Hover Overlay -->
-					<div class="album-hover-overlay">
-						<div class="view-pill">
-							<i class="material-icons view-icon">list</i>
-							<span>View</span>
+				<div
+					v-for="album in filteredAlbums"
+					:key="album.path || `${album.artist}-${album.title}`"
+					class="album-card group"
+					@click="openAlbumModal(album)"
+				>
+					<!-- Modern Album Cover Art -->
+					<div class="album-cover-box">
+						<img
+							v-if="album.cover"
+							:src="getCoverUrl(album.cover)"
+							:alt="album.title"
+							class="album-img"
+							loading="lazy"
+						/>
+						<div v-else class="album-placeholder">
+							<i class="material-icons album-placeholder-icon">album</i>
 						</div>
-						<button
-							class="quick-delete-album-btn"
-							:title="$t('libraryPage.deleteAlbum')"
-							@click.stop="confirmDeleteAlbum(album)"
-						>
-							<i class="material-icons text-base">delete</i>
-						</button>
+
+						<!-- Floating Glass Format Badge (Top-Left) -->
+						<div class="badge-floating-left">
+							<span class="glass-pill" :class="formatPillClass(getAlbumFormat(album))">
+								{{ getAlbumFormat(album) }}
+							</span>
+						</div>
+
+						<!-- Floating Quick Delete (Top-Right) -->
+						<div class="badge-floating-right">
+							<button
+								class="glass-delete-btn"
+								:title="$t('libraryPage.deleteAlbum')"
+								@click.stop="confirmDeleteAlbum(album)"
+							>
+								<i class="material-icons text-xs">delete</i>
+							</button>
+						</div>
+
+						<!-- Track Count Overlay (Bottom-Right) -->
+						<div class="track-count-overlay">
+							{{ album.tracksCount }} {{ $t('libraryPage.tracks') }}
+						</div>
+
+						<!-- Hover Overlay with Inspect Pill -->
+						<div class="album-hover-overlay">
+							<div class="inspect-pill">
+								<i class="material-icons text-base">visibility</i>
+								<span>Inspect</span>
+							</div>
+						</div>
 					</div>
 
-					<!-- Track count badge overlay -->
-					<div class="track-count-overlay">
-						{{ album.tracksCount }} {{ $t('libraryPage.tracks') }}
-					</div>
-				</div>
-
-				<!-- Album Meta -->
-				<div class="album-info">
-					<h4 class="album-title" :title="album.title">
-						{{ album.title }}
-					</h4>
-					<p class="album-artist" :title="album.artist">
-						{{ album.artist }}
-					</p>
-					<div class="album-submeta">
-						<span v-if="album.formattedTotalSize" class="album-size">
-							{{ album.formattedTotalSize }}
-						</span>
+					<!-- Album Info Footer -->
+					<div class="album-info">
+						<h4 class="album-title" :title="album.title">
+							{{ album.title }}
+						</h4>
+						<p class="album-artist" :title="album.artist">
+							{{ album.artist }}
+						</p>
+						<div class="album-submeta">
+							<span v-if="album.formattedTotalSize" class="album-size">
+								{{ album.formattedTotalSize }}
+							</span>
+						</div>
 					</div>
 				</div>
 			</div>
-		</div>
+
+			<!-- List Display Mode -->
+			<div
+				v-else-if="displayMode === 'list' && filteredAlbums.length > 0"
+				class="albums-list-container"
+			>
+				<div class="table-container">
+					<table class="tracks-table">
+						<thead>
+							<tr>
+								<th class="col-cover">Cover</th>
+								<th class="col-title">{{ $t('libraryPage.table.title') }}</th>
+								<th class="col-artist">{{ $t('libraryPage.table.artist') }}</th>
+								<th class="col-format">{{ $t('libraryPage.table.format') }}</th>
+								<th class="col-tracks">{{ $t('libraryPage.tracks') }}</th>
+								<th class="col-size">{{ $t('libraryPage.table.size') }}</th>
+								<th class="col-actions">{{ $t('libraryPage.table.actions') }}</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr
+								v-for="album in filteredAlbums"
+								:key="album.path || `${album.artist}-${album.title}`"
+								class="track-row album-list-row"
+								@click="openAlbumModal(album)"
+							>
+								<td class="col-cover">
+									<div class="list-thumb-box">
+										<img
+											v-if="album.cover"
+											:src="getCoverUrl(album.cover)"
+											:alt="album.title"
+											class="list-thumb-img"
+											loading="lazy"
+										/>
+										<i v-else class="material-icons text-sm text-secondary">album</i>
+									</div>
+								</td>
+								<td class="col-title track-title-cell">
+									<div class="track-title-text" :title="album.title">
+										{{ album.title }}
+									</div>
+								</td>
+								<td class="col-artist track-artist-cell" :title="album.artist">
+									{{ album.artist }}
+								</td>
+								<td class="col-format track-format-cell">
+									<span class="format-pill" :class="formatPillClass(getAlbumFormat(album))">
+										{{ getAlbumFormat(album) }}
+									</span>
+								</td>
+								<td class="col-tracks text-center">
+									<span class="meta-pill">{{ album.tracksCount }}</span>
+								</td>
+								<td class="col-size track-size-cell">
+									{{ album.formattedTotalSize }}
+								</td>
+								<td class="col-actions track-actions-cell" @click.stop>
+									<button
+										class="track-delete-btn"
+										:title="$t('libraryPage.deleteAlbum')"
+										@click.stop="confirmDeleteAlbum(album)"
+									>
+										<i class="material-icons">delete_outline</i>
+									</button>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+
+			<!-- Empty State -->
+			<div v-else class="empty-state-card">
+				<div class="empty-icon-box">
+					<i class="material-icons empty-icon">{{ searchQuery ? 'search_off' : 'library_music' }}</i>
+				</div>
+				<h3 class="empty-title">
+					{{ searchQuery ? $t('libraryPage.empty.noSearchTitle') : $t('libraryPage.empty.emptyTitle') }}
+				</h3>
+				<p class="empty-description">
+					{{ searchQuery ? $t('libraryPage.empty.noSearchMessage') : $t('libraryPage.empty.emptyMessage') }}
+				</p>
+				<button
+					v-if="!searchQuery"
+					class="btn btn-primary mt-6"
+					@click="rescanLibrary(true)"
+				>
+					<i class="material-icons mr-1.5 text-base">sync</i>
+					{{ $t('libraryPage.scanLibrary') }}
+				</button>
+			</div>
+		</template>
 
 		<!-- 2. ARTISTS VIEW -->
-		<div
-			v-else-if="activeView === 'artists' && filteredArtists.length > 0"
-			class="artists-grid"
-		>
+		<template v-else-if="activeView === 'artists'">
 			<div
-				v-for="artist in filteredArtists"
-				:key="artist.name"
-				class="artist-card"
-				@click="selectArtist(artist)"
+				v-if="filteredArtists.length > 0"
+				class="artists-grid"
 			>
-				<div class="artist-avatar-box">
-					<i class="material-icons artist-avatar-icon">person</i>
-				</div>
-				<div class="artist-info">
-					<h4 class="artist-name" :title="artist.name">{{ artist.name }}</h4>
-					<div class="artist-meta-badges">
-						<span class="badge-pill">
-							<i class="material-icons text-xs">album</i>
-							{{ artist.albumsCount }} {{ artist.albumsCount === 1 ? 'Album' : 'Albums' }}
-						</span>
-						<span class="badge-pill">
-							<i class="material-icons text-xs">audiotrack</i>
-							{{ artist.totalTracks }} {{ artist.totalTracks === 1 ? 'Track' : 'Tracks' }}
-						</span>
+				<div
+					v-for="artist in filteredArtists"
+					:key="artist.name"
+					class="artist-card"
+					@click="selectArtist(artist)"
+				>
+					<div class="artist-avatar-box">
+						<i class="material-icons artist-avatar-icon">person</i>
+					</div>
+					<div class="artist-info">
+						<h4 class="artist-name" :title="artist.name">{{ artist.name }}</h4>
+						<div class="artist-meta-badges">
+							<span class="badge-pill">
+								<i class="material-icons text-xs">album</i>
+								{{ artist.albumsCount }} {{ artist.albumsCount === 1 ? 'Album' : 'Albums' }}
+							</span>
+							<span class="badge-pill">
+								<i class="material-icons text-xs">audiotrack</i>
+								{{ artist.totalTracks }} {{ artist.totalTracks === 1 ? 'Track' : 'Tracks' }}
+							</span>
+						</div>
+					</div>
+					<div class="artist-arrow">
+						<i class="material-icons">chevron_right</i>
 					</div>
 				</div>
-				<div class="artist-arrow">
-					<i class="material-icons">chevron_right</i>
-				</div>
 			</div>
-		</div>
+
+			<div v-else class="empty-state-card">
+				<div class="empty-icon-box">
+					<i class="material-icons empty-icon">{{ searchQuery ? 'search_off' : 'person_off' }}</i>
+				</div>
+				<h3 class="empty-title">No Matching Artists</h3>
+				<p class="empty-description">No artists in your library match the current search query.</p>
+			</div>
+		</template>
 
 		<!-- 3. ALL TRACKS VIEW -->
-		<div
-			v-else-if="activeView === 'tracks' && filteredTracks.length > 0"
-			class="tracks-view-container"
-		>
-			<div class="table-container">
-				<table class="tracks-table">
-					<thead>
-						<tr>
-							<th class="col-num">#</th>
-							<th class="col-title">{{ $t('libraryPage.table.title') }}</th>
-							<th class="col-artist">{{ $t('libraryPage.table.artist') }}</th>
-							<th class="col-album">Album</th>
-							<th class="col-format">{{ $t('libraryPage.table.format') }}</th>
-							<th class="col-size">{{ $t('libraryPage.table.size') }}</th>
-							<th class="col-actions">{{ $t('libraryPage.table.actions') }}</th>
-						</tr>
-					</thead>
-					<tbody>
-						<tr
-							v-for="(track, index) in filteredTracks"
-							:key="track.path || `${track.title}-${index}`"
-							class="track-row"
-						>
-							<td class="col-num track-num-cell">
-								{{ track.trackNumber || (index + 1) }}
-							</td>
-							<td class="col-title track-title-cell">
-								<div class="track-title-text" :title="track.title">
-									{{ track.title }}
-								</div>
-							</td>
-							<td class="col-artist track-artist-cell" :title="track.artist">
-								{{ track.artist }}
-							</td>
-							<td class="col-album track-album-cell">
-								<a
-									href="javascript:void(0)"
-									class="album-link"
-									:title="track.albumTitle || track.album"
-									@click.stop="openTrackAlbum(track)"
-								>
-									{{ track.albumTitle || track.album }}
-								</a>
-							</td>
-							<td class="col-format track-format-cell">
-								<span class="format-pill" :class="formatPillClass(track.format)">
-									{{ (track.format || 'MP3').toUpperCase() }}
-								</span>
-							</td>
-							<td class="col-size track-size-cell">
-								{{ track.formattedSize }}
-							</td>
-							<td class="col-actions track-actions-cell">
-								<button
-									class="track-delete-btn"
-									:title="$t('libraryPage.deleteTrack')"
-									@click.stop="confirmDeleteTrack(track)"
-								>
-									<i class="material-icons">delete_outline</i>
-								</button>
-							</td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
-		</div>
-
-		<!-- Empty State -->
-		<div v-else class="empty-state-card">
-			<div class="empty-icon-box">
-				<i class="material-icons empty-icon">{{ searchQuery ? 'search_off' : 'library_music' }}</i>
-			</div>
-			<h3 class="empty-title">
-				{{ searchQuery ? $t('libraryPage.empty.noSearchTitle') : $t('libraryPage.empty.emptyTitle') }}
-			</h3>
-			<p class="empty-description">
-				{{ searchQuery ? $t('libraryPage.empty.noSearchMessage') : $t('libraryPage.empty.emptyMessage') }}
-			</p>
-			<button
-				v-if="!searchQuery"
-				class="btn btn-primary mt-6"
-				@click="rescanLibrary(true)"
+		<template v-else-if="activeView === 'tracks'">
+			<div
+				v-if="filteredTracks.length > 0"
+				class="tracks-view-container"
 			>
-				<i class="material-icons mr-1.5 text-base">sync</i>
-				{{ $t('libraryPage.scanLibrary') }}
-			</button>
-		</div>
+				<div class="table-container">
+					<table class="tracks-table">
+						<thead>
+							<tr>
+								<th class="col-num">#</th>
+								<th class="col-title">{{ $t('libraryPage.table.title') }}</th>
+								<th class="col-artist">{{ $t('libraryPage.table.artist') }}</th>
+								<th class="col-album">Album</th>
+								<th class="col-format">{{ $t('libraryPage.table.format') }}</th>
+								<th class="col-size">{{ $t('libraryPage.table.size') }}</th>
+								<th class="col-actions">{{ $t('libraryPage.table.actions') }}</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr
+								v-for="(track, index) in filteredTracks"
+								:key="track.path || `${track.title}-${index}`"
+								class="track-row"
+							>
+								<td class="col-num track-num-cell">
+									{{ track.trackNumber || (index + 1) }}
+								</td>
+								<td class="col-title track-title-cell">
+									<div class="track-title-text" :title="track.title">
+										{{ track.title }}
+									</div>
+								</td>
+								<td class="col-artist track-artist-cell" :title="track.artist">
+									{{ track.artist }}
+								</td>
+								<td class="col-album track-album-cell">
+									<a
+										href="javascript:void(0)"
+										class="album-link"
+										:title="track.albumTitle || track.album"
+										@click.stop="openTrackAlbum(track)"
+									>
+										{{ track.albumTitle || track.album }}
+									</a>
+								</td>
+								<td class="col-format track-format-cell">
+									<span class="format-pill" :class="formatPillClass(track.format)">
+										{{ (track.format || 'MP3').toUpperCase() }}
+									</span>
+								</td>
+								<td class="col-size track-size-cell">
+									{{ track.formattedSize }}
+								</td>
+								<td class="col-actions track-actions-cell">
+									<button
+										class="track-delete-btn"
+										:title="$t('libraryPage.deleteTrack')"
+										@click.stop="confirmDeleteTrack(track)"
+									>
+										<i class="material-icons">delete_outline</i>
+									</button>
+								</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+
+			<div v-else class="empty-state-card">
+				<div class="empty-icon-box">
+					<i class="material-icons empty-icon">{{ searchQuery ? 'search_off' : 'audiotrack' }}</i>
+				</div>
+				<h3 class="empty-title">No Matching Tracks</h3>
+				<p class="empty-description">No audio tracks match the current search or filter query.</p>
+			</div>
+		</template>
 
 		<!-- Guaranteed-Visible Album Detail Modal -->
 		<div
@@ -496,6 +630,8 @@ export default {
 	data() {
 		return {
 			activeView: 'albums',
+			displayMode: 'grid',
+			sortBy: 'title_asc',
 			isScanning: false,
 			isDeleting: false,
 			downloadLocation: '',
@@ -513,7 +649,7 @@ export default {
 		searchPlaceholder() {
 			if (this.activeView === 'artists') return 'Search artists...'
 			if (this.activeView === 'tracks') return 'Search tracks, artists, or albums...'
-			return this.$t('libraryPage.searchPlaceholder')
+			return 'Search albums by title or artist...'
 		},
 		allAlbums() {
 			const albums = []
@@ -527,15 +663,35 @@ export default {
 			return albums
 		},
 		filteredAlbums() {
-			if (!this.searchQuery.trim()) {
-				return this.allAlbums
+			let albums = [...this.allAlbums]
+			if (this.searchQuery.trim()) {
+				const query = this.searchQuery.toLowerCase().trim()
+				albums = albums.filter(album => {
+					const titleMatch = (album.title || '').toLowerCase().includes(query)
+					const artistMatch = (album.artist || '').toLowerCase().includes(query)
+					return titleMatch || artistMatch
+				})
 			}
-			const query = this.searchQuery.toLowerCase().trim()
-			return this.allAlbums.filter(album => {
-				const titleMatch = (album.title || '').toLowerCase().includes(query)
-				const artistMatch = (album.artist || '').toLowerCase().includes(query)
-				return titleMatch || artistMatch
-			})
+
+			switch (this.sortBy) {
+				case 'title_desc':
+					albums.sort((a, b) => (b.title || '').localeCompare(a.title || ''))
+					break
+				case 'artist_asc':
+					albums.sort((a, b) => (a.artist || '').localeCompare(b.artist || '') || (a.title || '').localeCompare(b.title || ''))
+					break
+				case 'tracks_desc':
+					albums.sort((a, b) => (b.tracksCount || 0) - (a.tracksCount || 0))
+					break
+				case 'size_desc':
+					albums.sort((a, b) => (b.totalSize || 0) - (a.totalSize || 0))
+					break
+				case 'title_asc':
+				default:
+					albums.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+					break
+			}
+			return albums
 		},
 		allTracks() {
 			const tracks = []
@@ -553,20 +709,57 @@ export default {
 			return tracks
 		},
 		filteredTracks() {
-			if (!this.searchQuery.trim()) return this.allTracks
-			const q = this.searchQuery.toLowerCase().trim()
-			return this.allTracks.filter(
-				t =>
-					(t.title || '').toLowerCase().includes(q) ||
-					(t.artist || '').toLowerCase().includes(q) ||
-					(t.album || '').toLowerCase().includes(q) ||
-					(t.albumTitle || '').toLowerCase().includes(q)
-			)
+			let tracks = [...this.allTracks]
+			if (this.searchQuery.trim()) {
+				const q = this.searchQuery.toLowerCase().trim()
+				tracks = tracks.filter(
+					t =>
+						(t.title || '').toLowerCase().includes(q) ||
+						(t.artist || '').toLowerCase().includes(q) ||
+						(t.album || '').toLowerCase().includes(q) ||
+						(t.albumTitle || '').toLowerCase().includes(q)
+				)
+			}
+
+			switch (this.sortBy) {
+				case 'title_desc':
+					tracks.sort((a, b) => (b.title || '').localeCompare(a.title || ''))
+					break
+				case 'artist_asc':
+					tracks.sort((a, b) => (a.artist || '').localeCompare(b.artist || '') || (a.title || '').localeCompare(b.title || ''))
+					break
+				case 'size_desc':
+					tracks.sort((a, b) => (b.size || 0) - (a.size || 0))
+					break
+				case 'title_asc':
+				default:
+					tracks.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+					break
+			}
+			return tracks
 		},
 		filteredArtists() {
-			if (!this.searchQuery.trim()) return this.artists
-			const q = this.searchQuery.toLowerCase().trim()
-			return this.artists.filter(a => (a.name || '').toLowerCase().includes(q))
+			let artists = [...this.artists]
+			if (this.searchQuery.trim()) {
+				const q = this.searchQuery.toLowerCase().trim()
+				artists = artists.filter(a => (a.name || '').toLowerCase().includes(q))
+			}
+
+			switch (this.sortBy) {
+				case 'title_desc':
+					artists.sort((a, b) => (b.name || '').localeCompare(a.name || ''))
+					break
+				case 'tracks_desc':
+					artists.sort((a, b) => (b.totalTracks || 0) - (a.totalTracks || 0))
+					break
+				case 'size_desc':
+				case 'title_asc':
+				case 'artist_asc':
+				default:
+					artists.sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+					break
+			}
+			return artists
 		},
 		libraryTotalFormattedSize() {
 			let totalBytes = 0
@@ -590,6 +783,10 @@ export default {
 		document.removeEventListener('keydown', this.handleKeyDown)
 	},
 	methods: {
+		getAlbumFormat(album) {
+			if (!album.tracks || album.tracks.length === 0) return 'MP3'
+			return (album.tracks[0].format || 'MP3').toUpperCase()
+		},
 		applyLibraryData(data) {
 			if (!data) return
 			this.downloadLocation = data.downloadLocation || ''
@@ -739,7 +936,7 @@ export default {
 	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
-	margin-bottom: 2rem;
+	margin-bottom: 1.75rem;
 	gap: 1rem;
 }
 
@@ -835,7 +1032,7 @@ export default {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 1rem;
-	margin-bottom: 1.75rem;
+	margin-bottom: 1.5rem;
 }
 
 @media (min-width: 640px) {
@@ -932,20 +1129,25 @@ export default {
 .text-emerald-val { color: #10b981; }
 .text-amber-val { color: #f59e0b; }
 
-/* Search & Filter Row */
-.search-filter-row {
+/* Unified Media Toolbar */
+.media-toolbar {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 1rem;
-	margin-bottom: 1.5rem;
+	margin-bottom: 1.75rem;
 	flex-wrap: wrap;
+	background: var(--surface-glass, rgba(255, 255, 255, 0.03));
+	padding: 0.75rem 1rem;
+	border: 1px solid var(--border-color);
+	border-radius: 1rem;
+	backdrop-filter: blur(12px);
 }
 
 .search-box {
 	position: relative;
 	flex: 1;
-	max-width: 28rem;
+	min-width: 16rem;
 	display: flex;
 	align-items: center;
 }
@@ -960,7 +1162,7 @@ export default {
 
 .search-box-input {
 	width: 100%;
-	padding: 0.65rem 2.25rem 0.65rem 2.6rem;
+	padding: 0.6rem 2.25rem 0.6rem 2.5rem;
 	border-radius: 0.75rem;
 	background: var(--card-background);
 	border: 1px solid var(--border-color);
@@ -992,13 +1194,90 @@ export default {
 	color: var(--foreground);
 }
 
-.results-summary {
-	font-size: 0.8125rem;
-	color: var(--secondary-text);
-	font-weight: 500;
+.toolbar-controls {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	flex-wrap: wrap;
 }
 
-/* Scanning / Loading State */
+.sort-control {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	background: var(--card-background);
+	border: 1px solid var(--border-color);
+	border-radius: 0.625rem;
+	padding: 0 0.5rem;
+	height: 2.35rem;
+}
+
+.sort-icon {
+	font-size: 1.1rem;
+	color: var(--secondary-text);
+}
+
+.sort-select {
+	background: transparent;
+	border: none;
+	color: var(--foreground);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	cursor: pointer;
+	outline: none;
+	padding-right: 0.25rem;
+}
+
+.sort-select option {
+	background: var(--card-background);
+	color: var(--foreground);
+}
+
+.view-switcher {
+	display: flex;
+	align-items: center;
+	background: var(--card-background);
+	border: 1px solid var(--border-color);
+	border-radius: 0.625rem;
+	padding: 0.15rem;
+	gap: 0.15rem;
+}
+
+.view-switch-btn {
+	background: transparent;
+	border: none;
+	color: var(--secondary-text);
+	padding: 0.35rem;
+	border-radius: 0.45rem;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.15s ease;
+}
+
+.view-switch-btn:hover {
+	color: var(--foreground);
+}
+
+.view-switch-btn.active {
+	background: var(--primary-color);
+	color: #fff;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.results-count-pill {
+	font-size: 0.75rem;
+	font-weight: 700;
+	color: var(--secondary-text);
+	background: var(--card-background);
+	border: 1px solid var(--border-color);
+	padding: 0.4rem 0.75rem;
+	border-radius: 0.625rem;
+	white-space: nowrap;
+}
+
+/* Scanning State */
 .scanning-state {
 	padding: 5rem 1rem;
 	text-align: center;
@@ -1037,35 +1316,11 @@ export default {
 	max-width: 24rem;
 }
 
-/* Albums Grid */
+/* Modern Albums Grid */
 .albums-grid {
 	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 	gap: 1.25rem;
-}
-
-@media (min-width: 640px) {
-	.albums-grid {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-	}
-}
-
-@media (min-width: 768px) {
-	.albums-grid {
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-	}
-}
-
-@media (min-width: 1024px) {
-	.albums-grid {
-		grid-template-columns: repeat(5, minmax(0, 1fr));
-	}
-}
-
-@media (min-width: 1280px) {
-	.albums-grid {
-		grid-template-columns: repeat(6, minmax(0, 1fr));
-	}
 }
 
 .album-card {
@@ -1120,6 +1375,68 @@ export default {
 	opacity: 0.3;
 }
 
+.badge-floating-left {
+	position: absolute;
+	top: 0.6rem;
+	left: 0.6rem;
+	z-index: 2;
+}
+
+.glass-pill {
+	padding: 0.15rem 0.5rem;
+	border-radius: 0.375rem;
+	font-size: 0.65rem;
+	font-weight: 800;
+	letter-spacing: 0.06em;
+	backdrop-filter: blur(8px);
+	background: rgba(0, 0, 0, 0.6);
+	border: 1px solid rgba(255, 255, 255, 0.15);
+	color: #fff;
+}
+
+.badge-floating-right {
+	position: absolute;
+	top: 0.6rem;
+	right: 0.6rem;
+	z-index: 2;
+}
+
+.glass-delete-btn {
+	width: 1.75rem;
+	height: 1.75rem;
+	border-radius: 9999px;
+	border: none;
+	background: rgba(0, 0, 0, 0.6);
+	backdrop-filter: blur(8px);
+	color: var(--secondary-text);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.glass-delete-btn:hover {
+	background: #f43f5e;
+	color: #fff;
+	transform: scale(1.1);
+}
+
+.track-count-overlay {
+	position: absolute;
+	bottom: 0.6rem;
+	right: 0.6rem;
+	background: rgba(0, 0, 0, 0.7);
+	backdrop-filter: blur(6px);
+	color: #e2e8f0;
+	padding: 0.15rem 0.5rem;
+	border-radius: 0.375rem;
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	z-index: 2;
+}
+
 .album-hover-overlay {
 	position: absolute;
 	inset: 0;
@@ -1130,14 +1447,14 @@ export default {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	gap: 0.5rem;
+	z-index: 3;
 }
 
 .album-card:hover .album-hover-overlay {
 	opacity: 1;
 }
 
-.view-pill {
+.inspect-pill {
 	display: flex;
 	align-items: center;
 	gap: 0.35rem;
@@ -1148,44 +1465,6 @@ export default {
 	font-size: 0.8125rem;
 	font-weight: 600;
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.view-icon {
-	font-size: 1rem;
-}
-
-.quick-delete-album-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 2.25rem;
-	height: 2.25rem;
-	background: rgba(244, 63, 94, 0.85);
-	color: #fff;
-	border: none;
-	border-radius: 9999px;
-	cursor: pointer;
-	transition: all 0.15s ease;
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.quick-delete-album-btn:hover {
-	background: #f43f5e;
-	transform: scale(1.1);
-}
-
-.track-count-overlay {
-	position: absolute;
-	bottom: 0.5rem;
-	right: 0.5rem;
-	background: rgba(0, 0, 0, 0.75);
-	backdrop-filter: blur(4px);
-	color: #e2e8f0;
-	padding: 0.15rem 0.5rem;
-	border-radius: 0.375rem;
-	font-size: 0.6875rem;
-	font-weight: 600;
-	letter-spacing: 0.02em;
 }
 
 .album-info {
@@ -1225,6 +1504,42 @@ export default {
 	font-size: 0.6875rem;
 	color: var(--muted-text);
 	font-variant-numeric: tabular-nums;
+}
+
+/* Albums List Mode */
+.albums-list-container {
+	width: 100%;
+}
+
+.album-list-row {
+	cursor: pointer;
+}
+
+.col-cover {
+	width: 3.5rem;
+	text-align: center;
+}
+
+.list-thumb-box {
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 0.5rem;
+	overflow: hidden;
+	background: #111;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.list-thumb-img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.col-tracks {
+	width: 6rem;
+	text-align: center;
 }
 
 /* Artists View */
