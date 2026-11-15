@@ -1,0 +1,15 @@
+{
+  "name": "deemix-docker",
+  "version": "2026.11.18",
+  "description": "Modern Docker container for deemix music downloader web application",
+  "private": true,
+  "scripts": {
+    "build": "yarn --cwd src predist",
+    "build:server": "yarn --cwd src/server build",
+    "build:webui": "yarn --cwd src/webui build",
+    "preview": "bash .agents/skills/preview-release/scripts/run_release_preview.sh",
+    "preview:stop": "bash .agents/skills/preview-release/scripts/stop_release_preview.sh",
+    "test": "yarn --cwd src/server test && yarn --cwd src/webui test",
+    "lint": "yarn --cwd src/server lint && yarn --cwd src/webui lint"
+  }
+}

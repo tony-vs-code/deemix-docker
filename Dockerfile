@@ -1,11 +1,8 @@
 # syntax=docker/dockerfile:1
 # -------------------------------------------------------------------
-# Stage 1: Build deemix-server binary
+# Stage 1: Platform-independent JS bundler (compiles once on host platform)
 # -------------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM node:18-bookworm-slim AS builder
-
-ARG TARGETARCH=amd64
-ARG STATIC_URL
+FROM --platform=$BUILDPLATFORM node:18-bookworm-slim AS bundler
 
 WORKDIR /build
 
@@ -15,7 +12,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     git \
     curl \
-    jq \
     python3 \
     make \
     g++ \
@@ -33,30 +29,43 @@ RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
     yarn config set network-timeout 1000000 -g && \
     yarn install-all
 
-# Copy source code after dependencies are installed
+# Copy version file and source code
+COPY version /build/version
 COPY src/ /build/src/
 
-# If STATIC_URL is provided, download prebuilt binary; otherwise build from source
+# Set version, patch dependencies, and compile JS bundles (server + webui)
+RUN yarn set-version && \
+    yarn patch-deps && \
+    yarn predist
+
+# -------------------------------------------------------------------
+# Stage 2: Target-specific binary generator
+# -------------------------------------------------------------------
+FROM bundler AS binary-builder
+
+ARG TARGETARCH=amd64
+ARG STATIC_URL
+
+WORKDIR /build/src
+
+# If STATIC_URL is provided, download prebuilt binary; otherwise package with pkg
 RUN if [ -n "$STATIC_URL" ]; then \
         echo "Fetching prebuilt deemix-server from ${STATIC_URL}..." && \
         curl -fsSL "${STATIC_URL}/deemix-server-linux-${TARGETARCH}" -o /deemix-server; \
     else \
-        echo "Building deemix-server from local source..." && \
-        # Configure pkg target based on TARGETARCH \
+        echo "Packaging deemix-server binary for target arch: ${TARGETARCH}..." && \
         case "${TARGETARCH}" in \
-            "amd64") PKG_TARGET="node16-linuxstatic-x64"; BIN_PATH="dist/deemix-server-x64" ;; \
-            "arm64") PKG_TARGET="node16-linuxstatic-arm64"; BIN_PATH="dist/deemix-server-arm64" ;; \
-            "arm"|"arm/v7") PKG_TARGET="node16-linuxstatic-armv7"; BIN_PATH="dist/deemix-server-armv7" ;; \
-            *) PKG_TARGET="node16-linuxstatic-x64"; BIN_PATH="dist/deemix-server-x64" ;; \
+            "amd64") PKG_TARGET="node16-linuxstatic-x64" ;; \
+            "arm64") PKG_TARGET="node16-linuxstatic-arm64" ;; \
+            "arm"|"arm/v7") PKG_TARGET="node16-linuxstatic-armv7" ;; \
+            *) PKG_TARGET="node16-linuxstatic-x64" ;; \
         esac && \
-        jq --arg t "$PKG_TARGET" '.pkg.targets = [$t]' server/package.json > tmp.$$.json && mv tmp.$$.json server/package.json && \
-        yarn dist-server && \
-        (cp "${BIN_PATH}" /deemix-server || cp dist/deemix-server* /deemix-server); \
+        ./node_modules/.bin/pkg --target "$PKG_TARGET" --output /deemix-server ./server/package.json; \
     fi && \
     chmod +x /deemix-server
 
 # -------------------------------------------------------------------
-# Stage 2: Final runtime image
+# Stage 3: Final runtime image
 # -------------------------------------------------------------------
 FROM lscr.io/linuxserver/baseimage-alpine:3.20
 
@@ -73,7 +82,7 @@ LABEL \
 
 RUN apk add --no-cache curl jq
 
-COPY --from=builder /deemix-server /deemix-server
+COPY --from=binary-builder /deemix-server /deemix-server
 COPY root/ /
 RUN chmod +x /etc/services.d/deemix/run /etc/cont-init.d/*
 
