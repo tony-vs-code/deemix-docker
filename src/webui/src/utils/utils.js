@@ -128,6 +128,7 @@ export function copyToClipboard(text) {
  * @since		0.0.0
  */
 export function getPropertyWithFallback(obj, ...props) {
+	if (!obj || typeof obj !== 'object') return null
 	for (const prop of props) {
 		// Example: this.is.an.example
 		const hasDotNotation = /\./.test(prop)
@@ -135,7 +136,7 @@ export function getPropertyWithFallback(obj, ...props) {
 		// Searching the properties in the object
 		const valueToTest = hasDotNotation
 			? prop.split('.').reduce((o, i) => {
-					if (o) return o[i]
+					if (o && typeof o === 'object') return o[i]
 					return undefined
 			  }, obj)
 			: obj[prop]

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Modern App Icon**: Created squircle dark-mode app icon (`assets/icon.jpg`) featuring neon equalizer waveforms.
+- **Build Caching**: Added [.dockerignore](file:///home/anthony/projects/deemix-docker/.dockerignore) reducing build context transfer from 265MB to ~110KB (99.96% reduction).
+- **Dependency Patch Automation**: Automated postinstall patching (`src/scripts/patch-dependencies.js`) for upstream libraries during build.
+
+### Changed
+- **Base Image Upgrade**: Migrated from deprecated `lsiobase/alpine:3.15` to current `lscr.io/linuxserver/baseimage-alpine:3.20`.
+- **Fast Layered Builds**: Separated dependency installation from source code compilation in `Dockerfile` with BuildKit yarn/apt cache mounts, reducing incremental rebuild times to ~2 seconds.
+
+### Fixed
+- **Playlist Download Crash (`HREF`)**: Fixed `Cannot read properties of undefined (reading 'HREF')` in `deezer-js` when handling tracks with regional restrictions or missing 30-second audio previews.
+
 ## [2026.11.14] - 2026-11-14
 
 ### Added

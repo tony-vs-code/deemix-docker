@@ -1,6 +1,10 @@
-# deemix-docker
+<p align="center">
+  <img src="assets/icon.jpg" width="128" height="128" alt="Deemix Logo" />
+</p>
 
-Deemix in a Docker container.
+<h1 align="center">deemix-docker</h1>
+
+<p align="center">Modern, lightweight Docker container for Deemix music downloader and library manager.</p>
 
 ## How to run this
 
