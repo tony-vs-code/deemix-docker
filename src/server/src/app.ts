@@ -9,6 +9,7 @@ import { NotLoggedIn, CantStream } from './helpers/errors'
 
 import { GUI_PACKAGE } from './helpers/paths'
 import { logger } from './helpers/logger'
+import { scanLibrary } from './helpers/libraryDb'
 
 // Types
 const Downloader = deemix.downloader.Downloader
@@ -291,6 +292,17 @@ export class DeemixApp {
 				// Save queue status
 				this.queue[currentUUID] = savedObject
 				fs.writeFileSync(configFolder + `queue${sep}${currentUUID}.json`, JSON.stringify(savedObject))
+
+				// Auto-index library database on download completion
+				if (this.queue[currentUUID].status === 'completed' || this.queue[currentUUID].status === 'withErrors') {
+					try {
+						const downloadLocation = this.settings?.downloadLocation || '/downloads'
+						const updatedLib = scanLibrary(downloadLocation)
+						this.listener.send('libraryUpdated', updatedLib)
+					} catch (scanErr) {
+						logger.error(`Failed to auto-index completed download: ${scanErr}`)
+					}
+				}
 			}
 			logger.info(this.queueOrder)
 			fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))

@@ -7,22 +7,29 @@
 					<i class="material-icons title-icon">library_music</i>
 					{{ $t('libraryPage.title') }}
 				</h1>
-				<div class="folder-badge">
-					<i class="material-icons folder-icon">folder</i>
-					<span class="folder-label">{{ $t('libraryPage.downloadPath') }}:</span>
-					<span class="folder-path">{{ downloadLocation || '/downloads' }}</span>
+				<div class="header-badges-row">
+					<div class="folder-badge">
+						<i class="material-icons folder-icon">folder</i>
+						<span class="folder-label">{{ $t('libraryPage.downloadPath') }}:</span>
+						<span class="folder-path">{{ downloadLocation || '/downloads' }}</span>
+					</div>
+					<div v-if="lastScanned" class="last-scanned-badge" :title="lastScanned">
+						<i class="material-icons schedule-icon">update</i>
+						<span class="scanned-label">{{ $t('libraryPage.lastScanned') }}:</span>
+						<span class="scanned-time">{{ formatTime(lastScanned) }}</span>
+					</div>
 				</div>
 			</div>
 
-			<!-- Scan Button -->
+			<!-- Scan / Rescan Button -->
 			<div class="header-actions">
 				<button
 					class="btn btn-primary action-btn"
 					:disabled="isScanning"
-					@click="scanLibrary"
+					@click="rescanLibrary(false)"
 				>
 					<i class="material-icons btn-icon" :class="{ 'spin-active': isScanning }">sync</i>
-					<span>{{ isScanning ? $t('libraryPage.scanning') : $t('libraryPage.scanLibrary') }}</span>
+					<span>{{ isScanning ? $t('libraryPage.scanning') : (allAlbums.length > 0 ? $t('libraryPage.rescanLibrary') : $t('libraryPage.scanLibrary')) }}</span>
 				</button>
 			</div>
 		</div>
@@ -126,6 +133,13 @@
 							<i class="material-icons view-icon">list</i>
 							<span>View</span>
 						</div>
+						<button
+							class="quick-delete-album-btn"
+							:title="$t('libraryPage.deleteAlbum')"
+							@click.stop="confirmDeleteAlbum(album)"
+						>
+							<i class="material-icons text-base">delete</i>
+						</button>
 					</div>
 
 					<!-- Track count badge overlay -->
@@ -165,7 +179,7 @@
 			<button
 				v-if="!searchQuery"
 				class="btn btn-primary mt-6"
-				@click="scanLibrary"
+				@click="rescanLibrary(true)"
 			>
 				<i class="material-icons mr-1.5 text-base">sync</i>
 				{{ $t('libraryPage.scanLibrary') }}
@@ -220,13 +234,23 @@
 						</div>
 					</div>
 
-					<button
-						class="modal-close-btn"
-						title="Close (Esc)"
-						@click="closeAlbumModal"
-					>
-						<i class="material-icons">close</i>
-					</button>
+					<div class="modal-header-actions">
+						<button
+							class="btn-delete-album"
+							:title="$t('libraryPage.deleteAlbum')"
+							@click="confirmDeleteAlbum(selectedAlbum)"
+						>
+							<i class="material-icons text-base">delete_outline</i>
+							<span>{{ $t('libraryPage.deleteAlbum') }}</span>
+						</button>
+						<button
+							class="modal-close-btn"
+							title="Close (Esc)"
+							@click="closeAlbumModal"
+						>
+							<i class="material-icons">close</i>
+						</button>
+					</div>
 				</div>
 
 				<!-- Tracklist Table -->
@@ -244,6 +268,7 @@
 									<th class="col-artist">{{ $t('libraryPage.table.artist') }}</th>
 									<th class="col-format">{{ $t('libraryPage.table.format') }}</th>
 									<th class="col-size">{{ $t('libraryPage.table.size') }}</th>
+									<th class="col-actions">{{ $t('libraryPage.table.actions') }}</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -274,6 +299,15 @@
 									<td class="col-size track-size-cell">
 										{{ track.formattedSize }}
 									</td>
+									<td class="col-actions track-actions-cell">
+										<button
+											class="track-delete-btn"
+											:title="$t('libraryPage.deleteTrack')"
+											@click.stop="confirmDeleteTrack(track)"
+										>
+											<i class="material-icons">delete_outline</i>
+										</button>
+									</td>
 								</tr>
 							</tbody>
 						</table>
@@ -288,24 +322,69 @@
 				</div>
 			</div>
 		</div>
+
+		<!-- Danger Confirmation Modal -->
+		<div
+			v-if="pendingDelete"
+			class="confirm-modal-backdrop"
+			@click.self="pendingDelete = null"
+		>
+			<div class="confirm-modal-card">
+				<div class="confirm-icon-box">
+					<i class="material-icons confirm-danger-icon">warning_amber</i>
+				</div>
+				<h3 class="confirm-modal-title">
+					{{ pendingDelete.type === 'album' ? $t('libraryPage.confirmDeleteAlbumTitle') : $t('libraryPage.confirmDeleteTrackTitle') }}
+				</h3>
+				<p class="confirm-modal-message">
+					{{
+						pendingDelete.type === 'album'
+							? $t('libraryPage.confirmDeleteAlbumMessage', { title: pendingDelete.item.title })
+							: $t('libraryPage.confirmDeleteTrackMessage', { title: pendingDelete.item.title })
+					}}
+				</p>
+				<div class="confirm-modal-actions">
+					<button
+						class="btn btn-secondary confirm-cancel-btn"
+						:disabled="isDeleting"
+						@click="pendingDelete = null"
+					>
+						{{ $t('libraryPage.cancel') }}
+					</button>
+					<button
+						class="btn btn-danger confirm-delete-btn"
+						:disabled="isDeleting"
+						@click="executeDelete"
+					>
+						<i v-if="isDeleting" class="material-icons btn-icon spin-active mr-1">sync</i>
+						<i v-else class="material-icons btn-icon mr-1">delete_forever</i>
+						<span>{{ isDeleting ? $t('libraryPage.deleting') : $t('libraryPage.deletePermanently') }}</span>
+					</button>
+				</div>
+			</div>
+		</div>
 	</div>
 </template>
 
 <script>
-import { fetchData } from '@/utils/api'
+import { fetchData, postToServer } from '@/utils/api'
+import { socket } from '@/utils/socket'
 
 export default {
 	name: 'Library',
 	data() {
 		return {
 			isScanning: false,
+			isDeleting: false,
 			downloadLocation: '',
+			lastScanned: null,
 			artists: [],
 			totalTracks: 0,
 			totalAlbums: 0,
 			totalArtists: 0,
 			searchQuery: '',
-			selectedAlbum: null
+			selectedAlbum: null,
+			pendingDelete: null
 		}
 	},
 	computed: {
@@ -344,28 +423,104 @@ export default {
 		}
 	},
 	mounted() {
-		this.scanLibrary()
+		this.loadLibrary()
+		socket.on('libraryUpdated', this.handleLibraryUpdated)
 		document.addEventListener('keydown', this.handleKeyDown)
 	},
 	destroyed() {
+		socket.off('libraryUpdated', this.handleLibraryUpdated)
 		document.removeEventListener('keydown', this.handleKeyDown)
 	},
 	methods: {
-		async scanLibrary() {
-			this.isScanning = true
+		applyLibraryData(data) {
+			if (!data) return
+			this.downloadLocation = data.downloadLocation || ''
+			this.lastScanned = data.lastScanned || null
+			this.artists = data.artists || []
+			this.totalTracks = data.totalTracks || 0
+			this.totalAlbums = data.totalAlbums || 0
+			this.totalArtists = data.totalArtists || 0
+
+			// Refresh selectedAlbum reference if modal is open
+			if (this.selectedAlbum) {
+				const found = this.allAlbums.find(
+					a => a.path === this.selectedAlbum.path || (a.title === this.selectedAlbum.title && a.artist === this.selectedAlbum.artist)
+				)
+				if (found && found.tracks && found.tracks.length > 0) {
+					this.selectedAlbum = found
+				} else {
+					this.selectedAlbum = null
+				}
+			}
+		},
+		async loadLibrary() {
 			try {
 				const data = await fetchData('getLibrary')
-				if (data) {
-					this.downloadLocation = data.downloadLocation || ''
-					this.artists = data.artists || []
-					this.totalTracks = data.totalTracks || 0
-					this.totalAlbums = data.totalAlbums || 0
-					this.totalArtists = data.totalArtists || 0
+				this.applyLibraryData(data)
+			} catch (error) {
+				console.error('Failed to load library:', error)
+			}
+		},
+		async rescanLibrary(force = false) {
+			this.isScanning = true
+			try {
+				const result = await postToServer('scanLibrary', { force })
+				if (result && result.library) {
+					this.applyLibraryData(result.library)
+				} else {
+					await this.loadLibrary()
 				}
 			} catch (error) {
-				console.error('Failed to scan library:', error)
+				console.error('Failed to rescan library:', error)
 			} finally {
 				this.isScanning = false
+			}
+		},
+		handleLibraryUpdated(updatedLib) {
+			if (updatedLib) {
+				this.applyLibraryData(updatedLib)
+			} else {
+				this.loadLibrary()
+			}
+		},
+		confirmDeleteAlbum(album) {
+			this.pendingDelete = { type: 'album', item: album }
+		},
+		confirmDeleteTrack(track) {
+			this.pendingDelete = { type: 'track', item: track }
+		},
+		async executeDelete() {
+			if (!this.pendingDelete) return
+			this.isDeleting = true
+			try {
+				if (this.pendingDelete.type === 'album') {
+					const res = await postToServer('deleteLibraryAlbum', { albumPath: this.pendingDelete.item.path })
+					if (res && res.library) {
+						this.applyLibraryData(res.library)
+					}
+					if (this.selectedAlbum && this.selectedAlbum.path === this.pendingDelete.item.path) {
+						this.closeAlbumModal()
+					}
+				} else if (this.pendingDelete.type === 'track') {
+					const res = await postToServer('deleteLibraryTrack', { trackPath: this.pendingDelete.item.path })
+					if (res && res.library) {
+						this.applyLibraryData(res.library)
+					}
+				}
+			} catch (error) {
+				console.error('Failed to delete library record:', error)
+			} finally {
+				this.isDeleting = false
+				this.pendingDelete = null
+			}
+		},
+		formatTime(isoString) {
+			if (!isoString) return ''
+			try {
+				const d = new Date(isoString)
+				return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+			} catch {
+				return isoString
 			}
 		},
 		getCoverUrl(coverPath) {
@@ -384,8 +539,12 @@ export default {
 			this.selectedAlbum = null
 		},
 		handleKeyDown(event) {
-			if (event.key === 'Escape' && this.selectedAlbum) {
-				this.closeAlbumModal()
+			if (event.key === 'Escape') {
+				if (this.pendingDelete) {
+					this.pendingDelete = null
+				} else if (this.selectedAlbum) {
+					this.closeAlbumModal()
+				}
 			}
 		},
 		formatPillClass(format) {
@@ -430,25 +589,36 @@ export default {
 	margin: 0;
 }
 
-.folder-badge {
+.header-badges-row {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin-top: 0.35rem;
+}
+
+.folder-badge,
+.last-scanned-badge {
 	display: flex;
 	align-items: center;
 	gap: 0.35rem;
 	color: var(--secondary-text);
 	font-size: 0.8125rem;
-	margin-top: 0.35rem;
 }
 
-.folder-icon {
+.folder-icon,
+.schedule-icon {
 	font-size: 1rem;
 	color: var(--muted-text);
 }
 
-.folder-label {
+.folder-label,
+.scanned-label {
 	font-weight: 500;
 }
 
-.folder-path {
+.folder-path,
+.scanned-time {
 	font-family: monospace;
 	font-size: 0.75rem;
 	background: var(--card-background);
@@ -456,6 +626,11 @@ export default {
 	padding: 0.15rem 0.5rem;
 	border-radius: 0.375rem;
 	color: var(--foreground);
+}
+
+.scanned-time {
+	color: #06b6d4;
+	border-color: rgba(6, 182, 212, 0.3);
 }
 
 .header-actions {
@@ -550,14 +725,15 @@ export default {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-bottom: 1.75rem;
 	gap: 1rem;
+	margin-bottom: 1.5rem;
+	flex-wrap: wrap;
 }
 
 .search-box {
 	position: relative;
 	flex: 1;
-	max-width: 26rem;
+	max-width: 28rem;
 	display: flex;
 	align-items: center;
 }
@@ -565,26 +741,26 @@ export default {
 .search-box-icon {
 	position: absolute;
 	left: 0.85rem;
+	font-size: 1.2rem;
 	color: var(--secondary-text);
-	font-size: 1.25rem;
 	pointer-events: none;
 }
 
 .search-box-input {
 	width: 100%;
-	padding: 0.6rem 2.5rem 0.6rem 2.6rem;
+	padding: 0.65rem 2.25rem 0.65rem 2.6rem;
 	border-radius: 0.75rem;
 	background: var(--card-background);
 	border: 1px solid var(--border-color);
 	color: var(--foreground);
 	font-size: 0.875rem;
-	outline: none;
 	transition: all 0.2s ease;
 }
 
 .search-box-input:focus {
+	outline: none;
 	border-color: var(--primary-color);
-	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+	box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb, 124, 58, 237), 0.2);
 }
 
 .search-clear-btn {
@@ -597,7 +773,6 @@ export default {
 	padding: 0.2rem;
 	display: flex;
 	align-items: center;
-	justify-content: center;
 	border-radius: 9999px;
 }
 
@@ -606,27 +781,26 @@ export default {
 }
 
 .results-summary {
-	font-size: 0.75rem;
+	font-size: 0.8125rem;
 	color: var(--secondary-text);
-	white-space: nowrap;
+	font-weight: 500;
 }
 
-/* Scanning State */
+/* Scanning / Loading State */
 .scanning-state {
+	padding: 5rem 1rem;
+	text-align: center;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	padding: 5rem 1rem;
-	text-align: center;
 }
 
 .spin-icon-box {
-	width: 4.5rem;
-	height: 4.5rem;
-	border-radius: 1.25rem;
-	background: var(--card-background);
-	border: 1px solid var(--border-color);
+	width: 4rem;
+	height: 4rem;
+	border-radius: 9999px;
+	background: rgba(var(--primary-color-rgb, 124, 58, 237), 0.1);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -634,21 +808,21 @@ export default {
 }
 
 .spin-large {
-	font-size: 2.5rem;
+	font-size: 2.25rem;
 	color: var(--primary-color);
 }
 
 .scanning-title {
-	font-size: 1.25rem;
+	font-size: 1.15rem;
 	font-weight: 700;
 	color: var(--foreground);
-	margin: 0;
+	margin-bottom: 0.35rem;
 }
 
 .scanning-subtitle {
 	font-size: 0.875rem;
 	color: var(--secondary-text);
-	margin-top: 0.35rem;
+	max-width: 24rem;
 }
 
 /* Albums Grid */
@@ -686,33 +860,29 @@ export default {
 	background: var(--card-background);
 	border: 1px solid var(--border-color);
 	border-radius: 1rem;
-	padding: 0.85rem;
+	overflow: hidden;
 	cursor: pointer;
 	transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 	display: flex;
 	flex-direction: column;
+	position: relative;
 }
 
 .album-card:hover {
 	border-color: var(--border-color-hover);
 	transform: translateY(-4px);
-	box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.25);
+	box-shadow: 0 16px 28px -6px rgba(0, 0, 0, 0.35);
 }
 
 .album-cover-box {
 	position: relative;
 	width: 100%;
-	padding-top: 100%;
-	border-radius: 0.75rem;
+	aspect-ratio: 1 / 1;
+	background: #111;
 	overflow: hidden;
-	background: var(--secondary-background);
-	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
 }
 
 .album-img {
-	position: absolute;
-	top: 0;
-	left: 0;
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
@@ -720,35 +890,35 @@ export default {
 }
 
 .album-card:hover .album-img {
-	transform: scale(1.06);
+	transform: scale(1.04);
 }
 
 .album-placeholder {
-	position: absolute;
-	top: 0;
-	left: 0;
 	width: 100%;
 	height: 100%;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	color: var(--muted-text);
+	background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%);
 }
 
 .album-placeholder-icon {
 	font-size: 3.5rem;
+	color: var(--secondary-text);
+	opacity: 0.3;
 }
 
 .album-hover-overlay {
 	position: absolute;
 	inset: 0;
-	background: rgba(15, 23, 42, 0.6);
-	backdrop-filter: blur(4px);
+	background: rgba(0, 0, 0, 0.55);
+	backdrop-filter: blur(2px);
+	opacity: 0;
+	transition: opacity 0.2s ease;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	opacity: 0;
-	transition: opacity 0.2s ease;
+	gap: 0.5rem;
 }
 
 .album-card:hover .album-hover-overlay {
@@ -756,91 +926,113 @@ export default {
 }
 
 .view-pill {
-	display: inline-flex;
+	display: flex;
 	align-items: center;
 	gap: 0.35rem;
-	padding: 0.35rem 0.75rem;
+	background: var(--primary-color);
+	color: #fff;
+	padding: 0.4rem 0.85rem;
 	border-radius: 9999px;
-	background: var(--primary-gradient);
-	color: #ffffff;
-	font-size: 0.75rem;
-	font-weight: 700;
-	box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .view-icon {
 	font-size: 1rem;
 }
 
+.quick-delete-album-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.25rem;
+	height: 2.25rem;
+	background: rgba(244, 63, 94, 0.85);
+	color: #fff;
+	border: none;
+	border-radius: 9999px;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.quick-delete-album-btn:hover {
+	background: #f43f5e;
+	transform: scale(1.1);
+}
+
 .track-count-overlay {
 	position: absolute;
 	bottom: 0.5rem;
-	left: 0.5rem;
-	background: rgba(15, 23, 42, 0.75);
+	right: 0.5rem;
+	background: rgba(0, 0, 0, 0.75);
 	backdrop-filter: blur(4px);
-	color: #f8fafc;
-	font-size: 0.6875rem;
-	font-weight: 700;
-	padding: 0.15rem 0.45rem;
+	color: #e2e8f0;
+	padding: 0.15rem 0.5rem;
 	border-radius: 0.375rem;
-	border: 1px solid rgba(255, 255, 255, 0.1);
+	font-size: 0.6875rem;
+	font-weight: 600;
+	letter-spacing: 0.02em;
 }
 
 .album-info {
-	margin-top: 0.75rem;
+	padding: 0.85rem;
+	display: flex;
+	flex-direction: column;
+	flex: 1;
 }
 
 .album-title {
 	font-size: 0.875rem;
 	font-weight: 700;
 	color: var(--foreground);
+	margin: 0 0 0.25rem 0;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	transition: color 0.15s ease;
-}
-
-.album-card:hover .album-title {
-	color: var(--primary-color);
 }
 
 .album-artist {
 	font-size: 0.75rem;
 	color: var(--secondary-text);
+	margin: 0 0 0.5rem 0;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	margin-top: 0.15rem;
 }
 
 .album-submeta {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-top: 0.35rem;
+	margin-top: auto;
+}
+
+.album-size {
 	font-size: 0.6875rem;
 	color: var(--muted-text);
+	font-variant-numeric: tabular-nums;
 }
 
 /* Empty State */
 .empty-state-card {
+	padding: 5rem 1.5rem;
+	text-align: center;
+	background: var(--card-background);
+	border: 1px dashed var(--border-color);
+	border-radius: 1.25rem;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	padding: 5rem 1.5rem;
-	text-align: center;
-	background: var(--card-background);
-	border: 1px dashed var(--border-color-hover);
-	border-radius: 1.25rem;
 }
 
 .empty-icon-box {
-	width: 5rem;
-	height: 5rem;
-	border-radius: 1.25rem;
-	background: var(--secondary-background);
-	border: 1px solid var(--border-color);
+	width: 4rem;
+	height: 4rem;
+	border-radius: 1rem;
+	background: rgba(255, 255, 255, 0.04);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -848,64 +1040,56 @@ export default {
 }
 
 .empty-icon {
-	font-size: 2.75rem;
-	color: var(--primary-color);
-	opacity: 0.8;
+	font-size: 2.25rem;
+	color: var(--secondary-text);
+	opacity: 0.6;
 }
 
 .empty-title {
-	font-size: 1.35rem;
-	font-weight: 700;
+	font-size: 1.25rem;
+	font-weight: 800;
 	color: var(--foreground);
-	margin: 0;
+	margin-bottom: 0.5rem;
 }
 
 .empty-description {
-	color: var(--secondary-text);
 	font-size: 0.875rem;
-	max-width: 24rem;
-	margin-top: 0.5rem;
+	color: var(--secondary-text);
+	max-width: 26rem;
 	line-height: 1.5;
 }
 
-/* Guaranteed-Visible Modal Backdrop */
+/* Detail Modal */
 .modal-backdrop {
 	position: fixed;
-	top: 0;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	width: 100vw;
-	height: 100vh;
-	background: rgba(0, 0, 0, 0.75);
-	backdrop-filter: blur(16px);
-	-webkit-backdrop-filter: blur(16px);
+	inset: 0;
+	background: rgba(0, 0, 0, 0.8);
+	backdrop-filter: blur(8px);
+	z-index: 99999;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	padding: 1.5rem;
-	z-index: 9999;
-	box-sizing: border-box;
 }
 
 .modal-card {
-	background: var(--card-background);
+	background: var(--background);
 	border: 1px solid var(--border-color);
 	border-radius: 1.25rem;
-	box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--border-color);
 	width: 100%;
-	max-width: 54rem;
-	max-height: 88vh;
+	max-width: 48rem;
+	max-height: 85vh;
 	display: flex;
 	flex-direction: column;
 	overflow: hidden;
-	animation: modalFadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+	box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+	animation: modalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes modalFadeIn {
+@keyframes modalPop {
 	from {
 		opacity: 0;
-		transform: scale(0.96) translateY(10px);
+		transform: scale(0.96) translateY(8px);
 	}
 	to {
 		opacity: 1;
@@ -914,31 +1098,31 @@ export default {
 }
 
 .modal-header {
+	padding: 1.5rem;
+	border-bottom: 1px solid var(--border-color);
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
-	padding: 1.5rem;
-	border-bottom: 1px solid var(--border-color);
-	gap: 1rem;
+	gap: 1.5rem;
+	background: var(--secondary-background);
 }
 
 .modal-header-main {
 	display: flex;
 	align-items: center;
 	gap: 1.25rem;
-	min-width: 0;
 	flex: 1;
+	min-width: 0;
 }
 
 .modal-cover-box {
-	width: 5.5rem;
-	height: 5.5rem;
-	border-radius: 0.875rem;
+	width: 6rem;
+	height: 6rem;
+	border-radius: 0.75rem;
 	overflow: hidden;
+	background: #111;
 	flex-shrink: 0;
-	background: var(--secondary-background);
-	border: 1px solid var(--border-color);
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+	box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
 }
 
 .modal-cover-img {
@@ -957,22 +1141,23 @@ export default {
 }
 
 .modal-header-info {
-	min-width: 0;
 	flex: 1;
+	min-width: 0;
 }
 
 .modal-type-badge {
-	font-size: 0.625rem;
+	font-size: 0.6875rem;
 	font-weight: 800;
-	letter-spacing: 0.1em;
+	letter-spacing: 0.08em;
 	color: var(--primary-color);
+	text-transform: uppercase;
 }
 
 .modal-album-title {
 	font-size: 1.35rem;
 	font-weight: 800;
 	color: var(--foreground);
-	margin: 0.15rem 0 0 0;
+	margin: 0.15rem 0 0.25rem 0;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -982,66 +1167,85 @@ export default {
 	font-size: 0.875rem;
 	color: var(--secondary-text);
 	font-weight: 500;
-	margin: 0.15rem 0 0 0;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
+	margin: 0 0 0.75rem 0;
 }
 
 .modal-pills-row {
 	display: flex;
+	align-items: center;
 	flex-wrap: wrap;
-	gap: 0.4rem;
-	margin-top: 0.5rem;
+	gap: 0.5rem;
 }
 
 .meta-pill {
 	display: inline-flex;
 	align-items: center;
 	gap: 0.25rem;
-	background: var(--secondary-background);
+	font-size: 0.75rem;
+	background: var(--card-background);
 	border: 1px solid var(--border-color);
-	padding: 0.15rem 0.5rem;
+	padding: 0.2rem 0.55rem;
 	border-radius: 0.375rem;
-	font-size: 0.6875rem;
 	color: var(--foreground);
-	font-weight: 600;
+	font-weight: 500;
 }
 
 .path-pill {
 	max-width: 14rem;
-	font-family: monospace;
-	font-size: 0.625rem;
-	color: var(--secondary-text);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	font-family: monospace;
+	font-size: 0.6875rem;
 }
 
 .pill-icon {
 	font-size: 0.85rem;
-	color: var(--primary-color);
+	color: var(--secondary-text);
+}
+
+.modal-header-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.btn-delete-album {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	background: rgba(244, 63, 94, 0.12);
+	border: 1px solid rgba(244, 63, 94, 0.35);
+	color: #f43f5e;
+	padding: 0.4rem 0.75rem;
+	border-radius: 0.5rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.btn-delete-album:hover {
+	background: #f43f5e;
+	color: #fff;
 }
 
 .modal-close-btn {
-	background: var(--secondary-background);
-	border: 1px solid var(--border-color);
+	background: transparent;
+	border: none;
 	color: var(--secondary-text);
-	width: 2.25rem;
-	height: 2.25rem;
+	cursor: pointer;
+	padding: 0.4rem;
 	border-radius: 9999px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	cursor: pointer;
 	transition: all 0.15s ease;
-	flex-shrink: 0;
 }
 
 .modal-close-btn:hover {
+	background: rgba(255, 255, 255, 0.08);
 	color: var(--foreground);
-	border-color: var(--border-color-hover);
-	background: var(--table-highlight);
 }
 
 /* Modal Body / Tracklist */
@@ -1052,11 +1256,14 @@ export default {
 }
 
 .tracklist-header-row {
-	margin-bottom: 0.75rem;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 0.85rem;
 }
 
 .tracklist-heading {
-	font-size: 0.75rem;
+	font-size: 0.875rem;
 	font-weight: 700;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
@@ -1064,7 +1271,6 @@ export default {
 }
 
 .table-container {
-	width: 100%;
 	border: 1px solid var(--border-color);
 	border-radius: 0.75rem;
 	overflow: hidden;
@@ -1076,18 +1282,15 @@ export default {
 	text-align: left;
 }
 
-.tracks-table thead tr {
-	background: var(--secondary-background);
-	border-bottom: 1px solid var(--border-color);
-}
-
 .tracks-table th {
+	background: var(--secondary-background);
 	padding: 0.65rem 0.85rem;
-	font-size: 0.6875rem;
+	font-size: 0.75rem;
 	font-weight: 700;
 	text-transform: uppercase;
-	letter-spacing: 0.05em;
+	letter-spacing: 0.04em;
 	color: var(--secondary-text);
+	border-bottom: 1px solid var(--border-color);
 }
 
 .track-row {
@@ -1131,6 +1334,11 @@ export default {
 	text-align: right;
 }
 
+.col-actions {
+	width: 4rem;
+	text-align: center;
+}
+
 .track-num-cell {
 	font-size: 0.75rem;
 	color: var(--secondary-text);
@@ -1147,7 +1355,7 @@ export default {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	max-width: 20rem;
+	max-width: 18rem;
 }
 
 .track-artist-mobile {
@@ -1168,7 +1376,7 @@ export default {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	max-width: 14rem;
+	max-width: 12rem;
 }
 
 .track-format-cell {
@@ -1208,6 +1416,28 @@ export default {
 	font-variant-numeric: tabular-nums;
 }
 
+.track-actions-cell {
+	text-align: center;
+}
+
+.track-delete-btn {
+	background: transparent;
+	border: none;
+	color: var(--secondary-text);
+	cursor: pointer;
+	padding: 0.25rem;
+	border-radius: 0.375rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.15s ease;
+}
+
+.track-delete-btn:hover {
+	color: #f43f5e;
+	background: rgba(244, 63, 94, 0.15);
+}
+
 /* Modal Footer */
 .modal-footer {
 	padding: 1rem 1.5rem;
@@ -1215,5 +1445,92 @@ export default {
 	background: var(--secondary-background);
 	display: flex;
 	justify-content: flex-end;
+}
+
+/* Danger Confirmation Modal */
+.confirm-modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.85);
+	backdrop-filter: blur(10px);
+	z-index: 100000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1.5rem;
+}
+
+.confirm-modal-card {
+	background: var(--card-background);
+	border: 1px solid rgba(244, 63, 94, 0.35);
+	border-radius: 1.25rem;
+	width: 100%;
+	max-width: 28rem;
+	padding: 1.75rem;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 25px rgba(244, 63, 94, 0.15);
+	animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.confirm-icon-box {
+	width: 3.5rem;
+	height: 3.5rem;
+	border-radius: 9999px;
+	background: rgba(244, 63, 94, 0.15);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: 1rem;
+}
+
+.confirm-danger-icon {
+	font-size: 2rem;
+	color: #f43f5e;
+}
+
+.confirm-modal-title {
+	font-size: 1.25rem;
+	font-weight: 800;
+	color: var(--foreground);
+	margin: 0 0 0.5rem 0;
+}
+
+.confirm-modal-message {
+	font-size: 0.875rem;
+	color: var(--secondary-text);
+	margin: 0 0 1.5rem 0;
+	line-height: 1.5;
+}
+
+.confirm-modal-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	width: 100%;
+}
+
+.confirm-cancel-btn {
+	flex: 1;
+	height: 2.6rem;
+	border-radius: 0.75rem;
+}
+
+.confirm-delete-btn {
+	flex: 1.4;
+	height: 2.6rem;
+	border-radius: 0.75rem;
+	background: #f43f5e;
+	color: #fff;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.confirm-delete-btn:hover:not(:disabled) {
+	background: #e11d48;
 }
 </style>

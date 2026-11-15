@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Persistent Library Database**: Integrated a JSON-backed database in `/config/library.json` with memory caching and `mtime` incremental scanning, providing instant library loading (<2ms) and eliminating redundant disk scans.
+- **Library Record Management & File Deletion**: Added ability to permanently delete albums and individual tracks directly from the UI with disk cleanup, path traversal security checks, and confirmation dialogs.
+- **Auto-Indexing on Download Completion**: Background incremental scanning automatically indexes newly downloaded songs into the database upon completion and broadcasts real-time updates over WebSockets (`libraryUpdated`).
 - **Modern App Icon & Favicons**: Created squircle dark-mode app icon (`assets/icon.jpg`) and multi-size browser tab favicons (`favicon.ico`, `favicon-32x32.png`, `apple-touch-icon.png`).
 - **Unified Queue View**: Merged downloading and queued items into a single unified "Queue" tab with overview stat cards for Downloading and Queued counts.
 - **Build Caching**: Added [.dockerignore](file:///home/anthony/projects/deemix-docker/.dockerignore) reducing build context transfer from 265MB to ~110KB (99.96% reduction).
