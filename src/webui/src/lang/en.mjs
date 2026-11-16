@@ -589,6 +589,22 @@ const en = {
 			emptyMessage: 'No audio files found in your configured download directory. Check your path in Settings or download some music.',
 			noSearchTitle: 'No Matching Albums',
 			noSearchMessage: 'No artists or albums match your search query.'
+		},
+		player: {
+			previous: 'Previous Track',
+			next: 'Next Track',
+			play: 'Play',
+			pause: 'Pause',
+			mute: 'Mute',
+			unmute: 'Unmute',
+			close: 'Close Player',
+			shuffle: 'Shuffle',
+			shuffleOn: 'Shuffle: On',
+			shuffleOff: 'Shuffle: Off',
+			repeat: 'Repeat',
+			repeatOff: 'Repeat: Off',
+			repeatAll: 'Repeat: All',
+			repeatOne: 'Repeat: One'
 		}
 	},
 	tracklist: {

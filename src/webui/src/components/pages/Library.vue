@@ -771,16 +771,24 @@
 			<div class="player-controls-center">
 				<div class="player-buttons-row">
 					<button
+						class="player-btn player-nav-btn player-toggle-btn"
+						:class="{ 'active-mode': isShuffled }"
+						:title="isShuffled ? $t('libraryPage.player.shuffleOn') : $t('libraryPage.player.shuffleOff')"
+						@click="toggleShuffle"
+					>
+						<i class="material-icons">shuffle</i>
+					</button>
+					<button
 						class="player-btn player-nav-btn"
 						:disabled="!hasPreviousTrack"
-						title="Previous Track"
+						:title="$t('libraryPage.player.previous')"
 						@click="playPreviousTrack"
 					>
 						<i class="material-icons">skip_previous</i>
 					</button>
 					<button
 						class="player-btn player-btn-main"
-						:title="isPlaying ? 'Pause' : 'Play'"
+						:title="isPlaying ? $t('libraryPage.player.pause') : $t('libraryPage.player.play')"
 						@click="togglePlayPause"
 					>
 						<i class="material-icons">{{ isPlaying ? 'pause' : 'play_arrow' }}</i>
@@ -788,10 +796,18 @@
 					<button
 						class="player-btn player-nav-btn"
 						:disabled="!hasNextTrack"
-						title="Next Track"
+						:title="$t('libraryPage.player.next')"
 						@click="playNextTrack"
 					>
 						<i class="material-icons">skip_next</i>
+					</button>
+					<button
+						class="player-btn player-nav-btn player-toggle-btn"
+						:class="{ 'active-mode': repeatMode !== 'off', 'repeat-one': repeatMode === 'one' }"
+						:title="repeatMode === 'one' ? $t('libraryPage.player.repeatOne') : (repeatMode === 'all' ? $t('libraryPage.player.repeatAll') : $t('libraryPage.player.repeatOff'))"
+						@click="cycleRepeatMode"
+					>
+						<i class="material-icons">{{ repeatMode === 'one' ? 'repeat_one' : 'repeat' }}</i>
 					</button>
 				</div>
 
@@ -815,7 +831,7 @@
 				<span class="format-pill mr-2" :class="formatPillClass(currentTrack.format)">
 					{{ (currentTrack.format || 'MP3').toUpperCase() }}
 				</span>
-				<button class="player-btn player-mute-btn" :title="isMuted ? 'Unmute' : 'Mute'" @click="toggleMute">
+				<button class="player-btn player-mute-btn" :title="isMuted ? $t('libraryPage.player.unmute') : $t('libraryPage.player.mute')" @click="toggleMute">
 					<i class="material-icons">{{ isMuted || audioVolume === 0 ? 'volume_off' : (audioVolume < 0.5 ? 'volume_down' : 'volume_up') }}</i>
 				</button>
 				<input
@@ -827,7 +843,7 @@
 					class="player-slider volume-slider"
 					@input="onVolumeInput"
 				/>
-				<button class="player-btn player-close-btn ml-2" title="Close Player" @click="closePlayer">
+				<button class="player-btn player-close-btn ml-2" :title="$t('libraryPage.player.close')" @click="closePlayer">
 					<i class="material-icons">close</i>
 				</button>
 			</div>
@@ -845,9 +861,70 @@ function fastCompare(a, b) {
 	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0
 }
 
+function loadStoredPlayerSettings() {
+	const defaults = {
+		audioVolume: 0.8,
+		isMuted: false,
+		isShuffled: false,
+		repeatMode: 'off'
+	}
+	try {
+		if (typeof window !== 'undefined' && window.localStorage) {
+			const vol = window.localStorage.getItem('audioVolume') || window.localStorage.getItem('deemix_player_volume')
+			if (vol !== null) {
+				const parsed = parseFloat(vol)
+				if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+					defaults.audioVolume = parsed
+				}
+			}
+			const muted = window.localStorage.getItem('isMuted') || window.localStorage.getItem('deemix_player_muted')
+			if (muted !== null) {
+				defaults.isMuted = muted === 'true'
+			}
+			const shuffled = window.localStorage.getItem('isShuffled') || window.localStorage.getItem('deemix_player_shuffled')
+			if (shuffled !== null) {
+				defaults.isShuffled = shuffled === 'true'
+			}
+			const rep = window.localStorage.getItem('repeatMode') || window.localStorage.getItem('deemix_player_repeat')
+			if (rep === 'off' || rep === 'all' || rep === 'one') {
+				defaults.repeatMode = rep
+			}
+		}
+	} catch (e) {
+		console.warn('Failed to read audio player settings from localStorage:', e)
+	}
+	return defaults
+}
+
+function saveStoredPlayerSettings(settings) {
+	try {
+		if (typeof window !== 'undefined' && window.localStorage) {
+			if (settings.audioVolume !== undefined) {
+				window.localStorage.setItem('audioVolume', String(settings.audioVolume))
+				window.localStorage.setItem('deemix_player_volume', String(settings.audioVolume))
+			}
+			if (settings.isMuted !== undefined) {
+				window.localStorage.setItem('isMuted', String(settings.isMuted))
+				window.localStorage.setItem('deemix_player_muted', String(settings.isMuted))
+			}
+			if (settings.isShuffled !== undefined) {
+				window.localStorage.setItem('isShuffled', String(settings.isShuffled))
+				window.localStorage.setItem('deemix_player_shuffled', String(settings.isShuffled))
+			}
+			if (settings.repeatMode !== undefined) {
+				window.localStorage.setItem('repeatMode', String(settings.repeatMode))
+				window.localStorage.setItem('deemix_player_repeat', String(settings.repeatMode))
+			}
+		}
+	} catch (e) {
+		console.warn('Failed to save audio player settings to localStorage:', e)
+	}
+}
+
 export default {
 	name: 'Library',
 	data() {
+		const storedSettings = loadStoredPlayerSettings()
 		return {
 			activeView: 'albums',
 			displayMode: 'grid',
@@ -873,10 +950,13 @@ export default {
 			isPlaying: false,
 			audioCurrentTime: 0,
 			audioDuration: 0,
-			audioVolume: 0.8,
-			isMuted: false,
+			audioVolume: storedSettings.audioVolume,
+			isMuted: storedSettings.isMuted,
+			isShuffled: storedSettings.isShuffled,
+			repeatMode: storedSettings.repeatMode,
 			playbackQueue: [],
 			queueIndex: -1,
+			playHistory: [],
 			cachedAlbums: [],
 			cachedTracks: []
 		}
@@ -893,6 +973,33 @@ export default {
 		activeView() {
 			this.albumCurrentPage = 1
 			this.trackCurrentPage = 1
+		},
+		audioVolume(val) {
+			saveStoredPlayerSettings({ audioVolume: val })
+		},
+		isMuted(val) {
+			saveStoredPlayerSettings({ isMuted: val })
+		},
+		isShuffled(val) {
+			saveStoredPlayerSettings({ isShuffled: val })
+		},
+		repeatMode(val) {
+			saveStoredPlayerSettings({ repeatMode: val })
+		},
+		currentTrack(newTrack) {
+			if (newTrack) {
+				this.$nextTick(() => {
+					this.setupMediaSessionActionHandlers()
+					this.updateMediaSessionMetadata()
+				})
+			} else {
+				this.clearMediaSession()
+			}
+		},
+		currentTrackCover() {
+			if (this.currentTrack) {
+				this.updateMediaSessionMetadata()
+			}
 		}
 	},
 	computed: {
@@ -925,10 +1032,19 @@ export default {
 			return this.currentTrack.albumCover || (this.selectedAlbum && this.selectedAlbum.cover) || ''
 		},
 		hasPreviousTrack() {
-			return this.playbackQueue.length > 1 && (this.queueIndex > 0 || this.audioCurrentTime > 3)
+			if (!this.currentTrack) return false
+			if (this.audioCurrentTime > 3) return true
+			if (this.playbackQueue.length <= 1) return false
+			if (this.isShuffled) {
+				return this.playHistory.length > 0 || this.queueIndex > 0 || this.repeatMode === 'all'
+			}
+			if (this.repeatMode === 'all') return true
+			return this.queueIndex > 0
 		},
 		hasNextTrack() {
-			return this.playbackQueue.length > 1 && this.queueIndex < this.playbackQueue.length - 1
+			if (!this.currentTrack || this.playbackQueue.length <= 1) return false
+			if (this.isShuffled || this.repeatMode === 'all') return true
+			return this.queueIndex < this.playbackQueue.length - 1
 		},
 		allAlbums() {
 			return this.cachedAlbums
@@ -1056,6 +1172,7 @@ export default {
 		}
 	},
 	mounted() {
+		this.restorePlayerSettings()
 		this.loadLibrary()
 		socket.on('libraryUpdated', this.handleLibraryUpdated)
 		document.addEventListener('keydown', this.handleKeyDown)
@@ -1069,15 +1186,56 @@ export default {
 		if (this.$refs.audioPlayer) {
 			this.$refs.audioPlayer.pause()
 		}
+		this.clearMediaSession()
 	},
 	methods: {
+		restorePlayerSettings() {
+			const s = loadStoredPlayerSettings()
+			this.audioVolume = s.audioVolume
+			this.isMuted = s.isMuted
+			this.isShuffled = s.isShuffled
+			this.repeatMode = s.repeatMode
+		},
+		persistPlayerSettings() {
+			saveStoredPlayerSettings({
+				audioVolume: this.audioVolume,
+				isMuted: this.isMuted,
+				isShuffled: this.isShuffled,
+				repeatMode: this.repeatMode
+			})
+		},
+		toggleShuffle() {
+			this.isShuffled = !this.isShuffled
+			this.persistPlayerSettings()
+		},
+		cycleRepeatMode() {
+			if (this.repeatMode === 'off') {
+				this.repeatMode = 'all'
+			} else if (this.repeatMode === 'all') {
+				this.repeatMode = 'one'
+			} else {
+				this.repeatMode = 'off'
+			}
+			this.persistPlayerSettings()
+		},
 		isCurrentTrack(track) {
 			return !!(this.currentTrack && track && this.currentTrack.path === track.path)
 		},
-		playTrack(track, queue = []) {
+		playTrack(track, queue = [], options = {}) {
 			if (this.currentTrack && this.currentTrack.path === track.path) {
+				if (options.restart) {
+					const audio = this.$refs.audioPlayer
+					if (audio) {
+						audio.currentTime = 0
+						audio.play().catch(e => console.warn('Playback error:', e))
+					}
+					return
+				}
 				this.togglePlayPause()
 				return
+			}
+			if (!options.isNavigation) {
+				this.playHistory = []
 			}
 			this.currentTrack = track
 			if (queue && queue.length > 0) {
@@ -1093,10 +1251,13 @@ export default {
 				if (audio) {
 					audio.load()
 					audio.volume = this.isMuted ? 0 : this.audioVolume
+					audio.muted = this.isMuted
 					audio.play().catch(e => {
 						console.warn('Playback error or autoplay blocked:', e)
 					})
 				}
+				this.setupMediaSessionActionHandlers()
+				this.updateMediaSessionMetadata()
 			})
 		},
 		togglePlayPause() {
@@ -1109,52 +1270,132 @@ export default {
 			}
 		},
 		playNextTrack() {
+			if (!this.playbackQueue || this.playbackQueue.length === 0) return
+
+			if (this.playbackQueue.length === 1) {
+				if (this.repeatMode === 'all' || this.repeatMode === 'one') {
+					const audio = this.$refs.audioPlayer
+					if (audio) {
+						audio.currentTime = 0
+						audio.play().catch(e => console.warn('Play error:', e))
+					}
+				}
+				return
+			}
+
+			if (this.isShuffled) {
+				if (this.currentTrack) {
+					this.playHistory.push(this.currentTrack)
+					if (this.playHistory.length > 100) {
+						this.playHistory.shift()
+					}
+				}
+				let nextIndex = Math.floor(Math.random() * (this.playbackQueue.length - 1))
+				if (nextIndex >= this.queueIndex && this.queueIndex >= 0) {
+					nextIndex++
+				}
+				this.queueIndex = nextIndex
+				const nextTrack = this.playbackQueue[nextIndex]
+				this.playTrack(nextTrack, this.playbackQueue, { isNavigation: true })
+				return
+			}
+
 			if (this.queueIndex >= 0 && this.queueIndex < this.playbackQueue.length - 1) {
 				this.queueIndex++
 				const nextTrack = this.playbackQueue[this.queueIndex]
-				this.playTrack(nextTrack, this.playbackQueue)
+				this.playTrack(nextTrack, this.playbackQueue, { isNavigation: true })
+			} else if (this.repeatMode === 'all') {
+				this.queueIndex = 0
+				const nextTrack = this.playbackQueue[0]
+				this.playTrack(nextTrack, this.playbackQueue, { isNavigation: true })
 			}
 		},
 		playPreviousTrack() {
 			if (this.audioCurrentTime > 3) {
 				const audio = this.$refs.audioPlayer
-				if (audio) audio.currentTime = 0
+				if (audio) {
+					audio.currentTime = 0
+				}
+				this.audioCurrentTime = 0
+				this.updateMediaSessionPositionState()
 				return
 			}
+
+			if (this.isShuffled && this.playHistory.length > 0) {
+				const prevTrack = this.playHistory.pop()
+				const idx = this.playbackQueue.findIndex(t => t.path === prevTrack.path)
+				this.queueIndex = idx !== -1 ? idx : 0
+				this.playTrack(prevTrack, this.playbackQueue, { isNavigation: true })
+				return
+			}
+
 			if (this.queueIndex > 0) {
 				this.queueIndex--
 				const prevTrack = this.playbackQueue[this.queueIndex]
-				this.playTrack(prevTrack, this.playbackQueue)
+				this.playTrack(prevTrack, this.playbackQueue, { isNavigation: true })
+			} else if (this.repeatMode === 'all' && this.playbackQueue.length > 1) {
+				this.queueIndex = this.playbackQueue.length - 1
+				const prevTrack = this.playbackQueue[this.queueIndex]
+				this.playTrack(prevTrack, this.playbackQueue, { isNavigation: true })
+			} else {
+				const audio = this.$refs.audioPlayer
+				if (audio) {
+					audio.currentTime = 0
+				}
+				this.audioCurrentTime = 0
+				this.updateMediaSessionPositionState()
 			}
 		},
 		onAudioPlay() {
 			this.isPlaying = true
+			this.updateMediaSessionPlaybackState('playing')
+			this.updateMediaSessionPositionState()
 		},
 		onAudioPause() {
 			this.isPlaying = false
+			this.updateMediaSessionPlaybackState('paused')
+			this.updateMediaSessionPositionState()
 		},
 		onAudioTimeUpdate() {
 			const audio = this.$refs.audioPlayer
 			if (audio) {
 				this.audioCurrentTime = audio.currentTime
+				this.updateMediaSessionPositionState()
 			}
 		},
 		onAudioLoadedMetadata() {
 			const audio = this.$refs.audioPlayer
 			if (audio) {
 				this.audioDuration = audio.duration || 0
+				this.updateMediaSessionPositionState()
 			}
 		},
 		onAudioEnded() {
+			if (this.repeatMode === 'one') {
+				const audio = this.$refs.audioPlayer
+				if (audio) {
+					audio.currentTime = 0
+					audio.play().catch(e => console.warn('Replay error:', e))
+				}
+				return
+			}
 			if (this.hasNextTrack) {
 				this.playNextTrack()
+			} else if (this.repeatMode === 'all' && this.playbackQueue.length === 1) {
+				const audio = this.$refs.audioPlayer
+				if (audio) {
+					audio.currentTime = 0
+					audio.play().catch(e => console.warn('Replay error:', e))
+				}
 			} else {
 				this.isPlaying = false
+				this.updateMediaSessionPlaybackState('paused')
 			}
 		},
 		onAudioError(e) {
 			console.error('Audio playback error:', e)
 			this.isPlaying = false
+			this.updateMediaSessionPlaybackState('paused')
 		},
 		onSeekInput(event) {
 			const newTime = parseFloat(event.target.value)
@@ -1162,6 +1403,7 @@ export default {
 			const audio = this.$refs.audioPlayer
 			if (audio) {
 				audio.currentTime = newTime
+				this.updateMediaSessionPositionState()
 			}
 		},
 		onVolumeInput(event) {
@@ -1171,14 +1413,21 @@ export default {
 			const audio = this.$refs.audioPlayer
 			if (audio) {
 				audio.volume = vol
+				audio.muted = this.isMuted
 			}
+			this.persistPlayerSettings()
 		},
 		toggleMute() {
 			this.isMuted = !this.isMuted
+			if (!this.isMuted && this.audioVolume === 0) {
+				this.audioVolume = 0.8
+			}
 			const audio = this.$refs.audioPlayer
 			if (audio) {
 				audio.volume = this.isMuted ? 0 : this.audioVolume
+				audio.muted = this.isMuted
 			}
+			this.persistPlayerSettings()
 		},
 		closePlayer() {
 			const audio = this.$refs.audioPlayer
@@ -1189,6 +1438,137 @@ export default {
 			this.currentTrack = null
 			this.playbackQueue = []
 			this.queueIndex = -1
+			this.playHistory = []
+			this.clearMediaSession()
+		},
+		setupMediaSessionActionHandlers() {
+			if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return
+
+			const actions = [
+				['play', () => {
+					const audio = this.$refs.audioPlayer
+					if (audio) audio.play().catch(e => console.warn('Play error:', e))
+				}],
+				['pause', () => {
+					const audio = this.$refs.audioPlayer
+					if (audio) audio.pause()
+				}],
+				['previoustrack', () => {
+					this.playPreviousTrack()
+				}],
+				['nexttrack', () => {
+					this.playNextTrack()
+				}],
+				['seekto', (details) => {
+					if (details && typeof details.seekTime === 'number' && !isNaN(details.seekTime)) {
+						const audio = this.$refs.audioPlayer
+						if (audio) {
+							const maxDur = (audio.duration && !isNaN(audio.duration)) ? audio.duration : details.seekTime
+							const targetTime = Math.max(0, Math.min(details.seekTime, maxDur))
+							audio.currentTime = targetTime
+							this.audioCurrentTime = targetTime
+							this.updateMediaSessionPositionState()
+						}
+					}
+				}],
+				['stop', () => {
+					this.closePlayer()
+				}]
+			]
+
+			actions.forEach(([action, handler]) => {
+				try {
+					navigator.mediaSession.setActionHandler(action, handler)
+				} catch (e) {
+					// Action not supported in this browser
+				}
+			})
+		},
+		updateMediaSessionMetadata() {
+			if (typeof navigator === 'undefined' || !('mediaSession' in navigator) || typeof window.MediaMetadata === 'undefined') return
+			if (!this.currentTrack) {
+				try {
+					navigator.mediaSession.metadata = null
+				} catch (e) {}
+				return
+			}
+
+			try {
+				const title = this.currentTrack.title || 'Unknown Title'
+				const artist = this.currentTrack.artist || 'Unknown Artist'
+				const album = this.currentTrack.album || this.currentTrack.albumTitle || ''
+
+				let artwork = []
+				if (this.currentTrackCover) {
+					const coverRel = this.getCoverUrl(this.currentTrackCover)
+					if (coverRel) {
+						let fullUrl = coverRel
+						try {
+							fullUrl = new URL(coverRel, window.location.origin).href
+						} catch (urlErr) {
+							fullUrl = coverRel
+						}
+						artwork = [
+							{ src: fullUrl, sizes: '96x96' },
+							{ src: fullUrl, sizes: '128x128' },
+							{ src: fullUrl, sizes: '192x192' },
+							{ src: fullUrl, sizes: '256x256' },
+							{ src: fullUrl, sizes: '512x512' }
+						]
+					}
+				}
+
+				navigator.mediaSession.metadata = new window.MediaMetadata({
+					title,
+					artist,
+					album,
+					artwork
+				})
+			} catch (e) {
+				console.warn('Error setting MediaMetadata:', e)
+			}
+		},
+		updateMediaSessionPlaybackState(state) {
+			if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return
+			try {
+				navigator.mediaSession.playbackState = state
+			} catch (e) {}
+		},
+		updateMediaSessionPositionState() {
+			if (typeof navigator === 'undefined' || !('mediaSession' in navigator) || typeof navigator.mediaSession.setPositionState !== 'function') return
+			const audio = this.$refs.audioPlayer
+			if (!audio) return
+			const duration = audio.duration
+			if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) {
+				const position = Math.min(Math.max(0, audio.currentTime || 0), duration)
+				const playbackRate = (Number.isFinite(audio.playbackRate) && audio.playbackRate > 0) ? audio.playbackRate : 1.0
+				try {
+					navigator.mediaSession.setPositionState({
+						duration: duration,
+						playbackRate: playbackRate,
+						position: position
+					})
+				} catch (e) {
+					// Audio might be transitioning or unready
+				}
+			}
+		},
+		clearMediaSession() {
+			if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return
+			try {
+				navigator.mediaSession.playbackState = 'none'
+			} catch (e) {}
+
+			try {
+				navigator.mediaSession.metadata = null
+			} catch (e) {}
+
+			const actions = ['play', 'pause', 'previoustrack', 'nexttrack', 'seekto', 'stop']
+			actions.forEach(action => {
+				try {
+					navigator.mediaSession.setActionHandler(action, null)
+				} catch (e) {}
+			})
 		},
 		formatDuration(seconds) {
 			if (!seconds || isNaN(seconds) || seconds < 0) return '0:00'
@@ -2982,6 +3362,39 @@ export default {
 	cursor: not-allowed;
 }
 
+.player-toggle-btn {
+	position: relative;
+	border: 1px solid transparent;
+	transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.player-toggle-btn i {
+	font-size: 1.25rem;
+	transition: transform 0.2s ease;
+}
+
+.player-toggle-btn:hover:not(:disabled) i {
+	transform: scale(1.1);
+}
+
+.player-toggle-btn.active-mode {
+	color: var(--primary-color, #06b6d4);
+	background: rgba(6, 182, 212, 0.16);
+	border-color: rgba(6, 182, 212, 0.38);
+	box-shadow: 0 0 12px rgba(6, 182, 212, 0.28), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+}
+
+.player-toggle-btn.active-mode:hover {
+	color: #22d3ee;
+	background: rgba(6, 182, 212, 0.26);
+	border-color: rgba(6, 182, 212, 0.55);
+	box-shadow: 0 0 16px rgba(6, 182, 212, 0.42);
+}
+
+.player-toggle-btn.repeat-one {
+	box-shadow: 0 0 14px rgba(6, 182, 212, 0.36), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+}
+
 .player-btn-main {
 	width: 2.6rem;
 	height: 2.6rem;
@@ -3104,6 +3517,10 @@ export default {
 		gap: 0.75rem;
 	}
 
+	.player-buttons-row {
+		gap: 0.4rem;
+	}
+
 	.player-actions-right {
 		display: none;
 	}
@@ -3111,6 +3528,26 @@ export default {
 	.player-track-info {
 		min-width: 0;
 		max-width: 9rem;
+	}
+}
+
+@media (max-width: 480px) {
+	.player-track-info {
+		max-width: 6.5rem;
+	}
+
+	.player-buttons-row {
+		gap: 0.25rem;
+	}
+
+	.player-nav-btn {
+		width: 1.85rem;
+		height: 1.85rem;
+	}
+
+	.player-btn-main {
+		width: 2.3rem;
+		height: 2.3rem;
 	}
 }
 
