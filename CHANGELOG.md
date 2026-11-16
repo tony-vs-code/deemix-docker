@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.20] - 2026-11-15
+
+### Changed
+- Modern Categorized Settings Layout — eliminated all expanding accordion sections in `/settings`. Settings are now organized into 6 clearly defined, immediately visible category tabs: Account, General & Interface, Downloads & Quality, File & Folder Organization, Metadata & Tags, and Artwork & Covers.
+- Removed Spotify Settings — completely removed legacy Spotify developer credentials and settings from the user interface.
+- Enhanced Controls & Visuals — redesigned all inputs, custom switches, language flag grids, and profile cards with high-contrast dark slate glassmorphism matching Library and Downloads.
+
 ## [2026.11.19] - 2026-11-15
 
 ### Fixed
