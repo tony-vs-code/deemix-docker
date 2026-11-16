@@ -15,7 +15,9 @@ fi
 
 
 # add executability to server
-chmod +x /deemix-server
+if [ -f "/deemix-server" ]; then
+    chmod +x /deemix-server
+fi
 
 # Fix misconfigured download locations. The container's download map is always /downloads.
 if [ -f "/config/config.json" ]; then
