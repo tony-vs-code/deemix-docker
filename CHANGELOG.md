@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.21] - 2026-11-15
+
+### Changed
+- Modern Native Node 20 LTS Runtime — upgraded container runtime from deprecated Node 16 to official Node 20 LTS on Alpine 3.20.
+- Dropped `pkg` Binary Packaging — eliminated the monolithic `@yao-pkg/pkg` bundling step; the server now executes cleanly and natively as `node /app/server/dist/app.js` under the unprivileged `abc` user.
+- Accelerated Build Pipeline — by compiling TypeScript and WebUI bundles once on `$BUILDPLATFORM` and copying production assets to `/app`, multi-arch container build times are reduced dramatically.
+
 ## [2026.11.20] - 2026-11-15
 
 ### Changed
