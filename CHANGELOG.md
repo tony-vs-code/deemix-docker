@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.22] - 2026-11-15
+
+### Changed
+- Complete UI/UX Modernization — overhauled all remaining legacy views (`Home`, `Charts`, `Search`, `Artist`, and `Tracklist`) to match the dark slate glassmorphic design system of Library, Downloads, and Settings.
+- Home View — added modern header, glassmorphic card grids for popular playlists and albums with hover zoom and quick download actions, and an unauthenticated glass banner.
+- Charts View — added country selection grid with glassmorphic cards, gold/silver/bronze rank badges for top tracks, duration pills, and one-click download buttons.
+- Search View — added category navigation pills with icons and item counts, and dark glass results states.
+- Artist & Tracklist Views — added immersive hero banners with metadata pills, dark glass table rows with audio preview triggers, and sticky action footers.
+
 ## [2026.11.21] - 2026-11-15
 
 ### Changed
