@@ -3,16 +3,18 @@ import fs from 'fs'
 import deemix from 'deemix'
 import { LoginFile } from '../types'
 
-const configFolder = deemix.utils.localpaths.getConfigFolder()
+export const configFolder: string = deemix.utils.localpaths.getConfigFolder()
 
 const DEFAULTS: LoginFile = {
 	accessToken: null,
-	arl: null
+	arl: null,
+	arlUpdatedAt: null
 }
 
 let loginData: LoginFile = {
 	accessToken: null,
-	arl: null
+	arl: null,
+	arlUpdatedAt: null
 }
 
 export function loadLoginCredentials() {
@@ -32,7 +34,10 @@ export function getLoginCredentials(): LoginFile {
 }
 
 export function saveLoginCredentials(newLogin: LoginFile) {
-	if (newLogin.arl) loginData.arl = newLogin.arl
+	if (newLogin.arl) {
+		loginData.arl = newLogin.arl
+		loginData.arlUpdatedAt = typeof newLogin.arlUpdatedAt === 'number' ? newLogin.arlUpdatedAt : Date.now()
+	}
 	if (newLogin.accessToken) loginData.accessToken = newLogin.accessToken
 	if (!fs.existsSync(configFolder)) fs.mkdirSync(configFolder)
 	fs.writeFileSync(configFolder + 'login.json', JSON.stringify(loginData, null, 2))

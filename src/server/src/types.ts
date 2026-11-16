@@ -249,4 +249,19 @@ export interface Listener {
 export interface LoginFile {
 	arl: string | null
 	accessToken: string | null
+	arlUpdatedAt?: number | null
+}
+
+export interface ArlHealthResponse {
+	valid: boolean
+	hasArl: boolean
+	source: 'env' | 'saved' | 'session' | 'none'
+	tier: 'hifi' | 'premium' | 'free' | 'unknown'
+	canStreamLossless: boolean
+	canStreamHq: boolean
+	arlUpdatedAt: number | null
+	estimatedTotalDays: number
+	estimatedRemainingDays: number | null
+	expiringSoon: boolean
+	deezerReachable?: boolean
 }
