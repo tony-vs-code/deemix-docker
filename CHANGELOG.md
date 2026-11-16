@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.25] - 2026-11-16
+
+### Added
+- Audio Player Persistence: saved `audioVolume`, `isMuted`, `isShuffled`, and `repeatMode` (`off` / `all` / `one`) in `localStorage` across sessions.
+- Shuffle & Repeat Controls: added Shuffle toggle and Repeat cycle (`off` -> `all` -> `one`) buttons with track play-history stack for Previous navigation.
+- Media Session API Integration: hooked `navigator.mediaSession` metadata, multi-size artwork, playback state, position state, and OS/browser media key handlers (`play`, `pause`, `previoustrack`, `nexttrack`, `seekto`, `stop`).
+
 ## [2026.11.24] - 2026-11-16
 
 ### Added
