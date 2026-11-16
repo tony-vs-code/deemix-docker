@@ -15,6 +15,25 @@
 			<!-- Top Actions -->
 			<div class="header-actions">
 				<button
+					class="btn action-btn"
+					:class="queuePaused ? 'btn-primary' : 'btn-secondary'"
+					:disabled="queueCount === 0"
+					:title="queuePaused ? $t('downloadsPage.resumeQueue') : $t('downloadsPage.pauseQueue')"
+					@click="togglePauseQueue"
+				>
+					<i class="material-icons btn-icon">{{ queuePaused ? 'play_arrow' : 'pause' }}</i>
+					<span>{{ queuePaused ? $t('downloadsPage.resumeQueue') : $t('downloadsPage.pauseQueue') }}</span>
+				</button>
+				<button
+					class="btn btn-secondary action-btn"
+					:disabled="failedCount === 0"
+					:title="$t('downloadsPage.clearFailed')"
+					@click="clearFailed"
+				>
+					<i class="material-icons btn-icon">cleaning_services</i>
+					<span>{{ $t('downloadsPage.clearFailed') }}</span>
+				</button>
+				<button
 					class="btn btn-secondary action-btn"
 					:disabled="completedCount === 0"
 					:title="$t('globals.clean_queue_hint')"
@@ -33,6 +52,20 @@
 					<span>{{ $t('downloadsPage.cancelAll') }}</span>
 				</button>
 			</div>
+		</div>
+
+		<!-- Paused Banner Alert -->
+		<div v-if="queuePaused" class="queue-paused-banner">
+			<div class="banner-content">
+				<i class="material-icons banner-icon">pause_circle_filled</i>
+				<div class="banner-text">
+					<span class="banner-title">{{ $t('downloadsPage.queuePaused') }}</span>
+				</div>
+			</div>
+			<button class="btn btn-primary banner-resume-btn" @click="resumeQueue">
+				<i class="material-icons mr-1 text-base">play_arrow</i>
+				{{ $t('downloadsPage.resumeQueue') }}
+			</button>
 		</div>
 
 		<!-- Interactive Stat Filter Cards with Totals -->
@@ -104,6 +137,12 @@
 				v-for="item in filteredItems"
 				:key="item.uuid"
 				class="download-card"
+				:class="{ 'is-dragged': draggedUuid === item.uuid, 'drag-target-over': dragTargetUuid === item.uuid }"
+				:draggable="isQueued(item)"
+				@dragstart="onDragStart($event, item.uuid)"
+				@dragover.prevent="onDragOver($event, item.uuid)"
+				@dragleave="onDragLeave($event, item.uuid)"
+				@drop="onDrop($event, item.uuid)"
 			>
 				<div class="card-main">
 					<!-- Cover Artwork with Bitrate Tag -->
@@ -187,6 +226,26 @@
 				<!-- Actions Column -->
 				<div class="card-actions">
 					<button
+						v-if="isQueued(item)"
+						class="btn btn-secondary btn-only-icon action-move"
+						:disabled="isFirstInQueue(item.uuid)"
+						:title="$t('downloadsPage.moveUp')"
+						@click.stop="moveItemUp(item.uuid)"
+					>
+						<i class="material-icons">arrow_upward</i>
+					</button>
+
+					<button
+						v-if="isQueued(item)"
+						class="btn btn-secondary btn-only-icon action-move"
+						:disabled="isLastInQueue(item.uuid)"
+						:title="$t('downloadsPage.moveDown')"
+						@click.stop="moveItemDown(item.uuid)"
+					>
+						<i class="material-icons">arrow_downward</i>
+					</button>
+
+					<button
 						v-if="isFailed(item)"
 						class="btn btn-primary btn-only-icon"
 						:title="$t('downloadsPage.retry')"
@@ -238,12 +297,36 @@ export default {
 			queue: [],
 			queueList: {},
 			queueComplete: [],
-			activeFilter: 'queue'
+			activeFilter: 'queue',
+			queuePaused: false,
+			draggedUuid: null,
+			dragTargetUuid: null
 		}
 	},
 	computed: {
 		itemsArray() {
-			return Object.values(this.queueList)
+			const all = Object.values(this.queueList)
+			const queueOrderMap = new Map()
+			this.queue.forEach((uuid, idx) => queueOrderMap.set(uuid, idx))
+
+			return all.sort((a, b) => {
+				const aDownloading = this.isDownloading(a)
+				const bDownloading = this.isDownloading(b)
+				if (aDownloading && !bDownloading) return -1
+				if (!aDownloading && bDownloading) return 1
+
+				const aQueued = this.isQueued(a)
+				const bQueued = this.isQueued(b)
+				if (aQueued && bQueued) {
+					const orderA = queueOrderMap.has(a.uuid) ? queueOrderMap.get(a.uuid) : 999999
+					const orderB = queueOrderMap.has(b.uuid) ? queueOrderMap.get(b.uuid) : 999999
+					return orderA - orderB
+				}
+				if (aQueued && !bQueued) return -1
+				if (!aQueued && bQueued) return 1
+
+				return 0
+			})
 		},
 		totalCount() {
 			return this.itemsArray.length
@@ -334,6 +417,10 @@ export default {
 		socket.on('finishDownload', this.finishDownload)
 		socket.on('removedAllDownloads', this.removeAllDownloads)
 		socket.on('removedFinishedDownloads', this.removedFinishedDownloads)
+		socket.on('removedFailedDownloads', this.removedFailedDownloads)
+		socket.on('queuePaused', this.handleQueuePaused)
+		socket.on('queueResumed', this.handleQueueResumed)
+		socket.on('queueOrderUpdated', this.queueOrderUpdated)
 
 		this.loadInitialQueue()
 	},
@@ -347,6 +434,10 @@ export default {
 		socket.off('finishDownload', this.finishDownload)
 		socket.off('removedAllDownloads', this.removeAllDownloads)
 		socket.off('removedFinishedDownloads', this.removedFinishedDownloads)
+		socket.off('removedFailedDownloads', this.removedFailedDownloads)
+		socket.off('queuePaused', this.handleQueuePaused)
+		socket.off('queueResumed', this.handleQueueResumed)
+		socket.off('queueOrderUpdated', this.queueOrderUpdated)
 	},
 	methods: {
 		async loadInitialQueue() {
@@ -358,11 +449,16 @@ export default {
 			}
 		},
 		initQueue(data) {
+			if (!data) return
 			const {
 				queueOrder: initQueue = [],
 				current: currentItem,
-				queue: initQueueList = {}
+				currentItems = [],
+				queue: initQueueList = {},
+				queuePaused = false
 			} = data
+
+			this.queuePaused = !!queuePaused
 
 			const initQueueComplete = Object.values(initQueueList)
 				.filter(el => ['completed', 'withErrors', 'failed'].includes(el.status))
@@ -370,15 +466,23 @@ export default {
 
 			if (initQueueComplete && initQueueComplete.length) {
 				initQueueComplete.forEach(item => {
-					initQueueList[item].silent = true
-					this.addToQueue(initQueueList[item])
+					if (initQueueList[item]) {
+						initQueueList[item].silent = true
+						this.addToQueue(initQueueList[item])
+					}
 				})
 			}
 
-			if (currentItem) {
-				currentItem.silent = true
-				this.addToQueue(currentItem, true)
-			}
+			const activeItems = Array.isArray(currentItems) && currentItems.length > 0
+				? currentItems
+				: (currentItem ? [currentItem] : [])
+
+			activeItems.forEach(item => {
+				if (item) {
+					item.silent = true
+					this.addToQueue(item, true)
+				}
+			})
 
 			initQueue.forEach(item => {
 				if (!initQueueList[item]) return
@@ -460,6 +564,13 @@ export default {
 			if (!currentItem) {
 				this.queue = []
 				this.queueList = {}
+			} else if (Array.isArray(currentItem)) {
+				this.queue = currentItem.filter(id => this.queueList[id])
+				const newQueueList = {}
+				this.queue.forEach(id => {
+					if (this.queueList[id]) newQueueList[id] = this.queueList[id]
+				})
+				this.queueList = newQueueList
 			} else {
 				this.queue = [currentItem]
 				const tempQueueItem = this.queueList[currentItem]
@@ -477,6 +588,19 @@ export default {
 			finishedUuids.forEach(uuid => {
 				const index = this.queueComplete.indexOf(uuid)
 				if (index > -1) this.queueComplete.splice(index, 1)
+				this.$delete(this.queueList, uuid)
+			})
+		},
+		removedFailedDownloads() {
+			const failedUuids = Object.values(this.queueList)
+				.filter(this.isFailed)
+				.map(item => item.uuid)
+
+			failedUuids.forEach(uuid => {
+				const index = this.queue.indexOf(uuid)
+				if (index > -1) this.queue.splice(index, 1)
+				const compIndex = this.queueComplete.indexOf(uuid)
+				if (compIndex > -1) this.queueComplete.splice(compIndex, 1)
 				this.$delete(this.queueList, uuid)
 			})
 		},
@@ -589,6 +713,11 @@ export default {
 		clearCompleted() {
 			socket.emit('removeFinishedDownloads')
 		},
+		async clearFailed() {
+			this.removedFailedDownloads()
+			await postToServer('clearFailedDownloads')
+			socket.emit('clearFailedDownloads')
+		},
 		cancelAll() {
 			socket.emit('cancelAllDownloads')
 		},
@@ -597,6 +726,111 @@ export default {
 		},
 		retryDownload(uuid) {
 			postToServer('retryDownload', { uuid })
+		},
+		handleQueuePaused(isPaused) {
+			this.queuePaused = !!isPaused
+		},
+		handleQueueResumed() {
+			this.queuePaused = false
+		},
+		togglePauseQueue() {
+			if (this.queuePaused) {
+				this.resumeQueue()
+			} else {
+				this.pauseQueue()
+			}
+		},
+		async pauseQueue() {
+			this.queuePaused = true
+			await postToServer('pauseQueue')
+			socket.emit('pauseQueue')
+		},
+		async resumeQueue() {
+			this.queuePaused = false
+			await postToServer('resumeQueue')
+			socket.emit('resumeQueue')
+		},
+		queueOrderUpdated(newOrder) {
+			if (!Array.isArray(newOrder)) return
+			const activeUuids = this.queue.filter(uuid => {
+				const item = this.queueList[uuid]
+				return item && this.isDownloading(item)
+			})
+			const validNewOrder = newOrder.filter(uuid => this.queueList[uuid] && !activeUuids.includes(uuid))
+			const rest = this.queue.filter(uuid => !validNewOrder.includes(uuid) && !activeUuids.includes(uuid))
+			this.queue = [...activeUuids, ...validNewOrder, ...rest]
+		},
+		isFirstInQueue(uuid) {
+			const q = this.queue.filter(u => this.queueList[u] && this.isQueued(this.queueList[u]))
+			return q.length > 0 && q[0] === uuid
+		},
+		isLastInQueue(uuid) {
+			const q = this.queue.filter(u => this.queueList[u] && this.isQueued(this.queueList[u]))
+			return q.length > 0 && q[q.length - 1] === uuid
+		},
+		async moveItemUp(uuid) {
+			const queued = this.queue.filter(u => this.queueList[u] && this.isQueued(this.queueList[u]))
+			const idx = queued.indexOf(uuid)
+			if (idx <= 0) return
+			const prevUuid = queued[idx - 1]
+			const qIdx1 = this.queue.indexOf(uuid)
+			const qIdx2 = this.queue.indexOf(prevUuid)
+			if (qIdx1 > -1 && qIdx2 > -1) {
+				const temp = this.queue[qIdx1]
+				this.$set(this.queue, qIdx1, this.queue[qIdx2])
+				this.$set(this.queue, qIdx2, temp)
+			}
+			await postToServer('reorderQueue', { uuid, direction: 'up' })
+		},
+		async moveItemDown(uuid) {
+			const queued = this.queue.filter(u => this.queueList[u] && this.isQueued(this.queueList[u]))
+			const idx = queued.indexOf(uuid)
+			if (idx === -1 || idx >= queued.length - 1) return
+			const nextUuid = queued[idx + 1]
+			const qIdx1 = this.queue.indexOf(uuid)
+			const qIdx2 = this.queue.indexOf(nextUuid)
+			if (qIdx1 > -1 && qIdx2 > -1) {
+				const temp = this.queue[qIdx1]
+				this.$set(this.queue, qIdx1, this.queue[qIdx2])
+				this.$set(this.queue, qIdx2, temp)
+			}
+			await postToServer('reorderQueue', { uuid, direction: 'down' })
+		},
+		onDragStart(event, uuid) {
+			if (!this.isQueued(this.queueList[uuid])) return
+			this.draggedUuid = uuid
+			if (event.dataTransfer) {
+				event.dataTransfer.effectAllowed = 'move'
+				event.dataTransfer.setData('text/plain', uuid)
+			}
+		},
+		onDragOver(event, targetUuid) {
+			if (!this.draggedUuid || this.draggedUuid === targetUuid) return
+			if (!this.isQueued(this.queueList[targetUuid])) return
+			this.dragTargetUuid = targetUuid
+		},
+		onDragLeave(event, targetUuid) {
+			if (this.dragTargetUuid === targetUuid) {
+				this.dragTargetUuid = null
+			}
+		},
+		async onDrop(event, targetUuid) {
+			const srcUuid = this.draggedUuid
+			this.draggedUuid = null
+			this.dragTargetUuid = null
+			if (!srcUuid || srcUuid === targetUuid) return
+			if (!this.isQueued(this.queueList[targetUuid])) return
+
+			const fromIdx = this.queue.indexOf(srcUuid)
+			const toIdx = this.queue.indexOf(targetUuid)
+			if (fromIdx > -1 && toIdx > -1) {
+				const newQueue = [...this.queue]
+				newQueue.splice(fromIdx, 1)
+				newQueue.splice(toIdx, 0, srcUuid)
+				this.queue = newQueue
+				const queuedOrder = this.queue.filter(u => this.queueList[u] && this.isQueued(this.queueList[u]))
+				await postToServer('reorderQueue', { newOrder: queuedOrder })
+			}
 		}
 	}
 }
@@ -1163,5 +1397,79 @@ export default {
 	max-width: 24rem;
 	margin-top: 0.5rem;
 	line-height: 1.5;
+}
+
+/* Paused Queue Banner */
+.queue-paused-banner {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0.875rem 1.25rem;
+	background: rgba(245, 158, 11, 0.12);
+	border: 1px solid rgba(245, 158, 11, 0.35);
+	border-radius: 0.875rem;
+	margin-bottom: 1.5rem;
+	backdrop-filter: blur(8px);
+	-webkit-backdrop-filter: blur(8px);
+}
+
+.banner-content {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.banner-icon {
+	font-size: 1.5rem;
+	color: #f59e0b;
+	flex-shrink: 0;
+}
+
+.banner-title {
+	font-size: 0.925rem;
+	font-weight: 600;
+	color: #f59e0b;
+}
+
+.banner-resume-btn {
+	display: flex;
+	align-items: center;
+	height: 2.25rem;
+	padding: 0 0.875rem;
+	font-size: 0.85rem;
+	border-radius: 0.5rem;
+	flex-shrink: 0;
+}
+
+/* Move Up / Move Down Actions */
+.action-move:disabled {
+	opacity: 0.35;
+	cursor: not-allowed;
+	pointer-events: none;
+}
+
+.action-move:hover:not(:disabled) {
+	color: var(--primary-color) !important;
+	border-color: var(--primary-color) !important;
+}
+
+/* Drag and Drop States */
+.download-card[draggable="true"] {
+	cursor: grab;
+}
+
+.download-card[draggable="true"]:active {
+	cursor: grabbing;
+}
+
+.download-card.is-dragged {
+	opacity: 0.45;
+	border: 1px dashed var(--primary-color);
+}
+
+.download-card.drag-target-over {
+	border: 2px solid var(--primary-color) !important;
+	transform: scale(1.01);
 }
 </style>

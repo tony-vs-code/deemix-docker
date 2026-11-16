@@ -94,7 +94,7 @@ export default defineComponent({
 		// Active downloads tracker for the badge
 		const queueList = ref({})
 		const queueOrder = ref([])
-		const currentUuid = ref(null)
+		const activeUuids = ref([])
 
 		const isFinished = item => {
 			if (!item) return true
@@ -106,7 +106,7 @@ export default defineComponent({
 
 		const isDownloading = item => {
 			if (!item || isFinished(item)) return false
-			return item.status === 'downloading' || item.status === 'converting' || currentUuid.value === item.uuid
+			return item.status === 'downloading' || item.status === 'converting' || activeUuids.value.includes(item.uuid)
 		}
 
 		const isQueued = item => {
@@ -142,19 +142,21 @@ export default defineComponent({
 		}
 
 		const handleStartDownload = uuid => {
-			currentUuid.value = uuid
+			if (!activeUuids.value.includes(uuid)) {
+				activeUuids.value = [...activeUuids.value, uuid]
+			}
 			updateItem(uuid, { status: 'downloading' })
 			queueOrder.value = queueOrder.value.filter(u => u !== uuid)
 		}
 
 		const handleFinishDownload = uuid => {
-			if (currentUuid.value === uuid) currentUuid.value = null
+			activeUuids.value = activeUuids.value.filter(u => u !== uuid)
 			updateItem(uuid, { status: 'download finished' })
 			queueOrder.value = queueOrder.value.filter(u => u !== uuid)
 		}
 
 		const handleRemoveFromQueue = uuid => {
-			if (currentUuid.value === uuid) currentUuid.value = null
+			activeUuids.value = activeUuids.value.filter(u => u !== uuid)
 			queueOrder.value = queueOrder.value.filter(u => u !== uuid)
 			const updated = { ...queueList.value }
 			delete updated[uuid]
@@ -162,7 +164,7 @@ export default defineComponent({
 		}
 
 		const handleRemoveAllDownloads = () => {
-			currentUuid.value = null
+			activeUuids.value = []
 			queueOrder.value = []
 			queueList.value = {}
 		}
@@ -177,6 +179,23 @@ export default defineComponent({
 			queueList.value = updated
 		}
 
+		const handleRemoveFailedDownloads = () => {
+			const updated = { ...queueList.value }
+			Object.keys(updated).forEach(uuid => {
+				const item = updated[uuid]
+				if (item && (item.status === 'failed' || item.status === 'withErrors' || (item.failed || 0) > 0)) {
+					delete updated[uuid]
+				}
+			})
+			queueList.value = updated
+		}
+
+		const handleQueueOrderUpdated = newOrder => {
+			if (Array.isArray(newOrder)) {
+				queueOrder.value = newOrder
+			}
+		}
+
 		onMounted(async () => {
 			socket.on('startDownload', handleStartDownload)
 			socket.on('finishDownload', handleFinishDownload)
@@ -184,15 +203,25 @@ export default defineComponent({
 			socket.on('removedFromQueue', handleRemoveFromQueue)
 			socket.on('removedAllDownloads', handleRemoveAllDownloads)
 			socket.on('removedFinishedDownloads', handleRemoveFinishedDownloads)
+			socket.on('removedFailedDownloads', handleRemoveFailedDownloads)
+			socket.on('queueOrderUpdated', handleQueueOrderUpdated)
 
 			try {
 				const queueData = await fetchData('getQueue')
 				if (queueData) {
 					if (queueData.queue) queueList.value = queueData.queue
 					if (Array.isArray(queueData.queueOrder)) queueOrder.value = queueData.queueOrder
-					if (queueData.current && queueData.current.uuid) {
-						currentUuid.value = queueData.current.uuid
+					const active = []
+					if (Array.isArray(queueData.currentItems)) {
+						queueData.currentItems.forEach(item => {
+							if (item && item.uuid && !active.includes(item.uuid)) {
+								active.push(item.uuid)
+							}
+						})
+					} else if (queueData.current && queueData.current.uuid) {
+						active.push(queueData.current.uuid)
 					}
+					activeUuids.value = active
 				}
 			} catch (e) {
 				// socket will handle subsequent updates
@@ -206,6 +235,8 @@ export default defineComponent({
 			socket.off('removedFromQueue', handleRemoveFromQueue)
 			socket.off('removedAllDownloads', handleRemoveAllDownloads)
 			socket.off('removedFinishedDownloads', handleRemoveFinishedDownloads)
+			socket.off('removedFailedDownloads', handleRemoveFailedDownloads)
+			socket.off('queueOrderUpdated', handleQueueOrderUpdated)
 		})
 
 		ctx.root.$router.afterEach(to => {

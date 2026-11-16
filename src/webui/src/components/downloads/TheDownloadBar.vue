@@ -163,6 +163,8 @@ export default {
 		socket.on('finishDownload', this.finishDownload)
 		socket.on('removedAllDownloads', this.removeAllDownloads)
 		socket.on('removedFinishedDownloads', this.removedFinishedDownloads)
+		socket.on('removedFailedDownloads', this.removedFailedDownloads)
+		socket.on('queueOrderUpdated', this.queueOrderUpdated)
 
 		fetchData('getQueue')
 			.then(res => {
@@ -186,6 +188,19 @@ export default {
 		window.addEventListener('beforeunload', () => {
 			localStorage.setItem('downloadTabWidth', this.cachedTabWidth)
 		})
+	},
+	beforeDestroy() {
+		socket.off('startDownload', this.startDownload)
+		socket.off('startConversion', this.startConversion)
+		socket.off('finishConversion', this.finishConversion)
+		socket.off('addedToQueue', this.addToQueue)
+		socket.off('updateQueue', this.updateQueue)
+		socket.off('removedFromQueue', this.removeFromQueue)
+		socket.off('finishDownload', this.finishDownload)
+		socket.off('removedAllDownloads', this.removeAllDownloads)
+		socket.off('removedFinishedDownloads', this.removedFinishedDownloads)
+		socket.off('removedFailedDownloads', this.removedFailedDownloads)
+		socket.off('queueOrderUpdated', this.queueOrderUpdated)
 	},
 	methods: {
 		...mapActions(['setErrors']),
@@ -227,10 +242,16 @@ export default {
 				})
 			}
 
-			if (currentItem) {
-				currentItem.silent = true
-				this.addToQueue(currentItem, true)
-			}
+			const activeItems = Array.isArray(data.currentItems) && data.currentItems.length > 0
+				? data.currentItems
+				: (currentItem ? [currentItem] : [])
+
+			activeItems.forEach(item => {
+				if (item) {
+					item.silent = true
+					this.addToQueue(item, true)
+				}
+			})
 
 			initQueue.forEach(item => {
 				if (!initQueueList[item]) return
@@ -337,13 +358,22 @@ export default {
 			if (!currentItem) {
 				this.queue = []
 				this.queueList = {}
+			} else if (Array.isArray(currentItem)) {
+				this.queue = currentItem.filter(id => this.queueList[id])
+				const newQueueList = {}
+				this.queue.forEach(id => {
+					if (this.queueList[id]) newQueueList[id] = this.queueList[id]
+				})
+				this.queueList = newQueueList
 			} else {
 				this.queue = [currentItem]
 
 				const tempQueueItem = this.queueList[currentItem]
 
 				this.queueList = {}
-				this.queueList[currentItem] = tempQueueItem
+				if (tempQueueItem) {
+					this.queueList[currentItem] = tempQueueItem
+				}
 			}
 		},
 		removedFinishedDownloads() {
@@ -354,6 +384,27 @@ export default {
 			})
 
 			this.queueComplete = []
+		},
+		removedFailedDownloads() {
+			const failed = Object.values(this.queueList).filter(el =>
+				['failed', 'withErrors'].includes(el.status) || (el.errors && el.errors.length > 0) || (el.failed && el.failed > 0)
+			)
+			failed.forEach(item => {
+				const qIdx = this.queue.indexOf(item.uuid)
+				if (qIdx > -1) this.queue.splice(qIdx, 1)
+				const compIdx = this.queueComplete.indexOf(item.uuid)
+				if (compIdx > -1) this.queueComplete.splice(compIdx, 1)
+				this.$delete(this.queueList, item.uuid)
+			})
+		},
+		queueOrderUpdated(newOrder) {
+			if (!Array.isArray(newOrder)) return
+			const active = this.queue.filter(uuid => {
+				const item = this.queueList[uuid]
+				return item && (item.status === 'downloading' || item.status === 'converting')
+			})
+			const remaining = this.queue.filter(uuid => !newOrder.includes(uuid) && !active.includes(uuid))
+			this.queue = [...active, ...newOrder.filter(uuid => this.queueList[uuid]), ...remaining]
 		},
 		toggleDownloadTab() {
 			this.setTabWidth()

@@ -1,4 +1,5 @@
 import { ApiHandler, Settings, SpotifySettings } from '../../../types'
+import { sessionDZ } from '../../../app'
 
 const path = '/saveSettings'
 
@@ -9,7 +10,11 @@ export interface SaveSettingsData {
 
 const handler: ApiHandler['handler'] = (req, res) => {
 	const deemix = req.app.get('deemix')
-	const { settings, spotifySettings }: SaveSettingsData = req.query
+	const queryData: any = req.body?.settings ? req.body : req.query
+	const { settings, spotifySettings }: SaveSettingsData = queryData
+	if (req.session?.id && sessionDZ[req.session.id]) {
+		deemix.lastDZ = sessionDZ[req.session.id]
+	}
 	deemix.saveSettings(settings, spotifySettings)
 	deemix.listener.send('updateSettings', { settings, spotifySettings })
 	res.send({ result: true })
