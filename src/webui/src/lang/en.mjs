@@ -494,7 +494,97 @@ const en = {
 			init: 'Settings loaded!',
 			update: 'Settings updated!',
 			reset: 'Settings reset to default!',
-			ARLcopied: 'ARL copied to clipboard'
+			ARLcopied: 'ARL copied to clipboard',
+			snippetCopied: 'Snippet copied to clipboard!',
+			cookieNameCopied: 'Cookie name copied to clipboard!',
+			sessionVerified: 'Session verified with Deezer successfully',
+			sessionVerifyFailed: 'Deezer verification failed or unreachable'
+		},
+		arlHealth: {
+			title: 'Session & ARL Health',
+			subtitle: 'Real-time session diagnostics, token expiration tracking, and account stream capabilities',
+			verifySession: 'Verify Session',
+			verifying: 'Verifying...',
+			active: 'Active',
+			expiringSoon: 'Expiring Soon (≤14d)',
+			expired: 'Inactive / Expired',
+			verified: 'Deezer Connected',
+			unreachable: 'Deezer Unreachable',
+			source: {
+				label: 'Source',
+				env: 'Docker Environment (ARL)',
+				saved: 'Saved Credentials (login.json)',
+				session: 'Active Browser Session',
+				none: 'No ARL Configured'
+			},
+			tier: {
+				hifi: 'HiFi (FLAC)',
+				premium: 'Premium (320kbps)',
+				free: 'Free (128kbps)',
+				unknown: 'Unknown'
+			},
+			capabilities: {
+				flac: 'Lossless FLAC',
+				hq: '320kbps MP3',
+				standard: '128kbps MP3'
+			},
+			sessionLife: {
+				title: 'Session Life Estimate',
+				daysRemaining: '~{days} / 90 days remaining',
+				unknown: 'Session active (expiration date unknown)',
+				noSession: 'No active session token configured',
+				updated: 'Token saved {date}'
+			},
+			guideModal: {
+				title: 'How to Get Your Deezer ARL',
+				subtitle: 'Quick 3-step guide to extract your Deezer authentication token from any browser',
+				tabs: {
+					chrome: 'Chrome / Edge / Brave',
+					firefox: 'Firefox',
+					safari: 'Safari / Extensions'
+				},
+				chrome: {
+					step1Title: '1. Log into Deezer',
+					step1Desc: 'Open www.deezer.com in your browser and sign in to your Deezer account.',
+					step2Title: '2. Open Developer Tools',
+					step2Desc: 'Press F12 (or right-click anywhere and choose Inspect), then switch to the Application tab.',
+					step3Title: '3. Copy the arl Cookie',
+					step3Desc:
+						'Expand Cookies > https://www.deezer.com. Find the cookie named arl, double-click its value, and copy it.'
+				},
+				firefox: {
+					step1Title: '1. Log into Deezer',
+					step1Desc: 'Open www.deezer.com in Firefox and sign in to your Deezer account.',
+					step2Title: '2. Open Storage Inspector',
+					step2Desc: 'Press F12 (or right-click and choose Inspect), then click the Storage tab.',
+					step3Title: '3. Copy the arl Cookie',
+					step3Desc: 'Expand Cookies > https://www.deezer.com. Locate the arl entry and copy its Value column.'
+				},
+				safari: {
+					step1Title: '1. Log into Deezer',
+					step1Desc: 'Open www.deezer.com in Safari or install the Cookie-Editor extension in your browser.',
+					step2Title: '2. Open Cookie Inspector',
+					step2Desc:
+						'In Safari: Developer Tools (Option+Cmd+I) > Storage > Cookies; or click the Cookie-Editor toolbar button.',
+					step3Title: '3. Copy the arl Cookie',
+					step3Desc: 'Find the cookie named arl and copy its 192-character value.'
+				},
+				helperSnippet: {
+					title: 'One-Click Console Helper',
+					desc: 'Or run this in the Developer Tools Console on deezer.com to copy your ARL automatically:',
+					copySnippet: 'Copy JS Snippet',
+					cookieName: 'Cookie name: arl',
+					copyName: 'Copy "arl"'
+				},
+				quickConnect: {
+					title: 'Paste & Connect',
+					desc: 'Paste your copied ARL cookie below to connect immediately:',
+					placeholder: 'Paste your 192-character Deezer ARL cookie here...',
+					connect: 'Connect with ARL',
+					connecting: 'Connecting...'
+				},
+				close: 'Close'
+			}
 		}
 	},
 	sidebar: {
@@ -558,9 +648,11 @@ const en = {
 		deleteTrack: 'Delete Track',
 		deleting: 'Deleting...',
 		confirmDeleteAlbumTitle: 'Delete Album From Disk',
-		confirmDeleteAlbumMessage: 'Are you sure you want to permanently delete "{title}" and all of its audio files from your hard drive? This cannot be undone.',
+		confirmDeleteAlbumMessage:
+			'Are you sure you want to permanently delete "{title}" and all of its audio files from your hard drive? This cannot be undone.',
 		confirmDeleteTrackTitle: 'Delete Track From Disk',
-		confirmDeleteTrackMessage: 'Are you sure you want to permanently delete "{title}" from your hard drive? This cannot be undone.',
+		confirmDeleteTrackMessage:
+			'Are you sure you want to permanently delete "{title}" from your hard drive? This cannot be undone.',
 		deletePermanently: 'Permanently Delete',
 		cancel: 'Cancel',
 		scanning: 'Scanning...',
@@ -586,7 +678,8 @@ const en = {
 		},
 		empty: {
 			emptyTitle: 'Music Library Is Empty',
-			emptyMessage: 'No audio files found in your configured download directory. Check your path in Settings or download some music.',
+			emptyMessage:
+				'No audio files found in your configured download directory. Check your path in Settings or download some music.',
 			noSearchTitle: 'No Matching Albums',
 			noSearchMessage: 'No artists or albums match your search query.'
 		},

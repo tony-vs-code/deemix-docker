@@ -1,4 +1,5 @@
 import connect from './connect'
+import arlHealth from './arlHealth'
 import analyzeLink from './analyzeLink'
 import getHome from './getHome'
 import getCharts from './getCharts'
@@ -28,6 +29,7 @@ import exportLogs from './exportLogs'
 
 export default [
 	connect,
+	arlHealth,
 	albumSearch,
 	analyzeLink,
 	getHome,

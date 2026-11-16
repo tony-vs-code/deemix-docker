@@ -43,6 +43,133 @@
 		<div class="settings-content">
 			<!-- TAB 1: ACCOUNT -->
 			<div v-show="currentTab === 'account'" class="tab-content-panel space-y-6">
+				<!-- Session & ARL Health Status Panel -->
+				<div class="settings-card arl-health-card">
+					<div class="card-header arl-health-header">
+						<div class="card-icon-box" :class="healthIconBoxClass">
+							<i class="material-icons">{{ healthIcon }}</i>
+						</div>
+						<div class="card-titles">
+							<div class="flex-align-center gap-2 flex-wrap">
+								<h3 class="card-title">{{ $t('settings.arlHealth.title') }}</h3>
+								<span class="health-status-pill" :class="healthStatusPillClass">
+									<span class="status-dot"></span>
+									{{ healthStatusText }}
+								</span>
+								<span
+									v-if="arlHealth.deezerReachable !== undefined"
+									class="health-reachability-pill"
+									:class="arlHealth.deezerReachable ? 'reachability-online' : 'reachability-offline'"
+								>
+									<i class="material-icons text-xs">{{ arlHealth.deezerReachable ? 'cloud_done' : 'cloud_off' }}</i>
+									{{
+										arlHealth.deezerReachable ? $t('settings.arlHealth.verified') : $t('settings.arlHealth.unreachable')
+									}}
+								</span>
+							</div>
+							<p class="card-subtitle">{{ $t('settings.arlHealth.subtitle') }}</p>
+						</div>
+						<div class="header-actions-end">
+							<button
+								type="button"
+								class="btn btn-secondary btn-sm verify-session-btn"
+								:disabled="isVerifyingArl"
+								:title="$t('settings.arlHealth.verifySession')"
+								@click="verifyArlHealth"
+							>
+								<i class="material-icons btn-icon text-sm" :class="{ 'spin-animation': isVerifyingArl }">refresh</i>
+								<span>{{
+									isVerifyingArl ? $t('settings.arlHealth.verifying') : $t('settings.arlHealth.verifySession')
+								}}</span>
+							</button>
+						</div>
+					</div>
+
+					<div class="card-body">
+						<div class="health-metrics-grid">
+							<!-- Account Quality Tier Card -->
+							<div class="health-metric-box">
+								<div class="metric-label">
+									<i class="material-icons text-sm">workspace_premium</i>
+									Account Quality Tier
+								</div>
+								<div class="metric-value-row">
+									<span class="quality-tier-badge" :class="'tier-' + (arlHealth.tier || 'unknown')">
+										<i class="material-icons text-sm">{{ tierIcon }}</i>
+										{{ tierBadgeText }}
+									</span>
+								</div>
+								<!-- Capability Pills -->
+								<div class="capability-pills-row">
+									<span class="cap-pill" :class="{ 'cap-pill--enabled': arlHealth.canStreamLossless }">
+										<i class="material-icons text-xs">{{
+											arlHealth.canStreamLossless ? 'check_circle' : 'remove_circle_outline'
+										}}</i>
+										{{ $t('settings.arlHealth.capabilities.flac') }}
+									</span>
+									<span class="cap-pill" :class="{ 'cap-pill--enabled': arlHealth.canStreamHq }">
+										<i class="material-icons text-xs">{{
+											arlHealth.canStreamHq ? 'check_circle' : 'remove_circle_outline'
+										}}</i>
+										{{ $t('settings.arlHealth.capabilities.hq') }}
+									</span>
+									<span class="cap-pill" :class="{ 'cap-pill--enabled': arlHealth.valid }">
+										<i class="material-icons text-xs">{{
+											arlHealth.valid ? 'check_circle' : 'remove_circle_outline'
+										}}</i>
+										{{ $t('settings.arlHealth.capabilities.standard') }}
+									</span>
+								</div>
+							</div>
+
+							<!-- Session Life & Token Expiration -->
+							<div class="health-metric-box">
+								<div class="metric-label">
+									<i class="material-icons text-sm">hourglass_bottom</i>
+									{{ $t('settings.arlHealth.sessionLife.title') }}
+								</div>
+								<div class="metric-value-row">
+									<span class="session-days-text">
+										{{ sessionLifeText }}
+									</span>
+									<span v-if="arlHealth.source" class="source-tag">
+										{{ sourceBadgeText }}
+									</span>
+								</div>
+								<!-- Progress Bar -->
+								<div class="session-progress-wrapper">
+									<div class="session-progress-bar">
+										<div
+											class="session-progress-fill"
+											:class="sessionProgressColorClass"
+											:style="{ width: sessionProgressPercent + '%' }"
+										></div>
+									</div>
+									<span class="progress-percent-label">{{ sessionProgressPercent }}%</span>
+								</div>
+								<div class="session-meta-note">
+									<span v-if="formattedArlDate">
+										<i class="material-icons text-xs mr-1">history</i>
+										{{ $t('settings.arlHealth.sessionLife.updated', { date: formattedArlDate }) }}
+									</span>
+									<span v-else-if="arlHealth.valid && arlHealth.source === 'env'">
+										<i class="material-icons text-xs mr-1">code</i>
+										Loaded via Docker container environment variable
+									</span>
+									<span v-else-if="arlHealth.valid">
+										<i class="material-icons text-xs mr-1">info_outline</i>
+										Token active (expiration timestamp not tracked)
+									</span>
+									<span v-else>
+										<i class="material-icons text-xs mr-1">warning_amber</i>
+										Please connect with your Deezer account or ARL cookie
+									</span>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
 				<!-- Deezer Profile & Session Card -->
 				<div class="settings-card">
 					<div class="card-header">
@@ -75,7 +202,9 @@
 								<div class="user-greeting">
 									<i18n path="settings.login.loggedIn" tag="span">
 										<template #username>
-											<strong id="settings_username" ref="username" class="user-name-strong">{{ user.name || 'not logged' }}</strong>
+											<strong id="settings_username" ref="username" class="user-name-strong">{{
+												user.name || 'not logged'
+											}}</strong>
 										</template>
 									</i18n>
 								</div>
@@ -141,7 +270,9 @@
 						</div>
 						<div class="card-titles">
 							<h3 class="card-title">{{ $t('settings.login.arl.title') }}</h3>
-							<p class="card-subtitle">Authenticate or update your session token directly using your Deezer ARL cookie</p>
+							<p class="card-subtitle">
+								Authenticate or update your session token directly using your Deezer ARL cookie
+							</p>
 						</div>
 					</div>
 
@@ -155,19 +286,35 @@
 									:value="arl"
 									autocomplete="off"
 									placeholder="Paste your Deezer ARL cookie here..."
-									type="password"
+									:type="showArlText ? 'text' : 'password'"
 									class="modern-input"
 								/>
-								<button class="btn btn-secondary btn-icon-only" title="Copy ARL to clipboard" @click="copyARLtoClipboard">
+								<button
+									type="button"
+									class="btn btn-secondary btn-icon-only"
+									:title="showArlText ? 'Hide ARL' : 'Show ARL'"
+									@click="showArlText = !showArlText"
+								>
+									<i class="material-icons">{{ showArlText ? 'visibility_off' : 'visibility' }}</i>
+								</button>
+								<button
+									class="btn btn-secondary btn-icon-only"
+									title="Copy ARL to clipboard"
+									@click="copyARLtoClipboard"
+								>
 									<i class="material-icons">assignment</i>
 								</button>
 							</div>
 						</div>
 
 						<div class="arl-help-link">
-							<router-link :to="{ name: 'ARL' }" class="modern-link-inline">
+							<button type="button" class="modern-link-inline btn-link-reset" @click="showArlModal = true">
 								<i class="material-icons text-sm mr-1">help_outline</i>
 								{{ $t('settings.login.arl.question') }}
+							</button>
+							<router-link :to="{ name: 'ARL' }" class="modern-link-inline ml-4">
+								<i class="material-icons text-sm mr-1">open_in_new</i>
+								Full Guide
 							</router-link>
 						</div>
 
@@ -289,7 +436,12 @@
 							<span class="field-label">{{ $t('settings.downloadPath.title') }}</span>
 							<div class="input-with-button">
 								<input v-model="settings.downloadLocation" autocomplete="off" type="text" class="modern-input" />
-								<button v-if="clientMode" class="btn btn-secondary btn-icon-only" title="Browse folder" @click="selectDownloadFolder">
+								<button
+									v-if="clientMode"
+									class="btn btn-secondary btn-icon-only"
+									title="Browse folder"
+									@click="selectDownloadFolder"
+								>
 									<i class="material-icons">folder_open</i>
 								</button>
 							</div>
@@ -432,7 +584,10 @@
 						<div class="input-field-group">
 							<span class="field-label">{{ $t('settings.templates.tracknameTemplate') }}</span>
 							<input v-model="settings.tracknameTemplate" type="text" class="modern-input mb-3" />
-							<TemplateVariablesList :template-variables="trackTemplateVariables" @variable-click="onTemplateVariableClick">
+							<TemplateVariablesList
+								:template-variables="trackTemplateVariables"
+								@variable-click="onTemplateVariableClick"
+							>
 								<template #title>
 									{{ $t('settings.templates.tracknameAvailableVariables') }}
 								</template>
@@ -442,7 +597,10 @@
 						<div class="input-field-group">
 							<span class="field-label">{{ $t('settings.templates.albumTracknameTemplate') }}</span>
 							<input v-model="settings.albumTracknameTemplate" type="text" class="modern-input mb-3" />
-							<TemplateVariablesList :template-variables="trackTemplateVariables" @variable-click="onTemplateVariableClick">
+							<TemplateVariablesList
+								:template-variables="trackTemplateVariables"
+								@variable-click="onTemplateVariableClick"
+							>
 								<template #title>
 									{{ $t('settings.templates.albumTracknameAvailableVariables') }}
 								</template>
@@ -452,7 +610,10 @@
 						<div class="input-field-group">
 							<span class="field-label">{{ $t('settings.templates.playlistTracknameTemplate') }}</span>
 							<input v-model="settings.playlistTracknameTemplate" type="text" class="modern-input mb-3" />
-							<TemplateVariablesList :template-variables="trackTemplateVariables" @variable-click="onTemplateVariableClick">
+							<TemplateVariablesList
+								:template-variables="trackTemplateVariables"
+								@variable-click="onTemplateVariableClick"
+							>
 								<template #title>
 									{{ $t('settings.templates.playlistTracknameAvailableVariables') }}
 								</template>
@@ -593,35 +754,168 @@
 
 					<div class="card-body space-y-4">
 						<div class="tags-checkbox-grid">
-							<label class="modern-toggle-item"><input v-model="settings.tags.title" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.title') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.artist" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.artist') }}</span></label>
-							<label v-if="settings.tags.multiArtistSeparator != 'default'" class="modern-toggle-item"><input v-model="settings.tags.artists" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.artists') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.album" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.album') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.cover" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.cover') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.trackNumber" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.trackNumber') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.trackTotal" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.trackTotal') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.discNumber" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.discNumber') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.discTotal" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.discTotal') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.albumArtist" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.albumArtist') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.genre" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.genre') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.year" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.year') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.date" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.date') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.explicit" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.explicit') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.isrc" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.isrc') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.length" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.length') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.barcode" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.barcode') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.bpm" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.bpm') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.replayGain" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.replayGain') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.label" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.label') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.lyrics" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.lyrics') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.syncedLyrics" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.syncedLyrics') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.copyright" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.copyright') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.composer" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.composer') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.involvedPeople" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.involvedPeople') }}</span></label>
-							<label class="modern-toggle-item"><input v-model="settings.tags.source" type="checkbox" class="modern-checkbox" /><span class="toggle-title">{{ $t('settings.tags.source') }}</span></label>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.title" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.title') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.artist" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.artist') }}</span
+								></label
+							>
+							<label v-if="settings.tags.multiArtistSeparator != 'default'" class="modern-toggle-item"
+								><input v-model="settings.tags.artists" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.artists') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.album" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.album') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.cover" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.cover') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.trackNumber" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.trackNumber') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.trackTotal" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.trackTotal') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.discNumber" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.discNumber') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.discTotal" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.discTotal') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.albumArtist" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.albumArtist') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.genre" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.genre') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.year" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.year') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.date" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.date') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.explicit" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.explicit') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.isrc" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.isrc') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.length" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.length') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.barcode" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.barcode') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.bpm" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.bpm') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.replayGain" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.replayGain') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.label" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.label') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.lyrics" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.lyrics') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.syncedLyrics" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.syncedLyrics') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.copyright" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.copyright') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.composer" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.composer') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.involvedPeople" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.involvedPeople') }}</span
+								></label
+							>
+							<label class="modern-toggle-item"
+								><input v-model="settings.tags.source" type="checkbox" class="modern-checkbox" /><span
+									class="toggle-title"
+									>{{ $t('settings.tags.source') }}</span
+								></label
+							>
 						</div>
 
-						<p v-if="settings.tags.multiArtistSeparator != 'default' && !settings.tags.artists" class="input-warning-msg mt-3">
+						<p
+							v-if="settings.tags.multiArtistSeparator != 'default' && !settings.tags.artists"
+							class="input-warning-msg mt-3"
+						>
 							⚠️ {{ $t('settings.tags.artistsWarning') }}
 						</p>
 					</div>
@@ -647,11 +941,15 @@
 									<option value="nothing">{{ $t('settings.other.multiArtistSeparator.nothing') }}</option>
 									<option value="default">{{ $t('settings.other.multiArtistSeparator.default') }}</option>
 									<option value="andFeat">{{ $t('settings.other.multiArtistSeparator.andFeat') }}</option>
-									<option value=" & ">{{ $t('settings.other.multiArtistSeparator.using', { separator: ' & ' }) }}</option>
+									<option value=" & ">
+										{{ $t('settings.other.multiArtistSeparator.using', { separator: ' & ' }) }}
+									</option>
 									<option value=",">{{ $t('settings.other.multiArtistSeparator.using', { separator: ',' }) }}</option>
 									<option value=", ">{{ $t('settings.other.multiArtistSeparator.using', { separator: ', ' }) }}</option>
 									<option value="/">{{ $t('settings.other.multiArtistSeparator.using', { separator: '/' }) }}</option>
-									<option value=" / ">{{ $t('settings.other.multiArtistSeparator.using', { separator: ' / ' }) }}</option>
+									<option value=" / ">
+										{{ $t('settings.other.multiArtistSeparator.using', { separator: ' / ' }) }}
+									</option>
 									<option value=";">{{ $t('settings.other.multiArtistSeparator.using', { separator: ';' }) }}</option>
 									<option value="; ">{{ $t('settings.other.multiArtistSeparator.using', { separator: '; ' }) }}</option>
 								</select>
@@ -663,10 +961,34 @@
 							<div class="input-field-group">
 								<span class="field-label">{{ $t('settings.other.dateFormat.title') }}</span>
 								<select v-model="settings.dateFormat" class="modern-select">
-									<option value="Y-M-D">{{ `${$t('settings.other.dateFormat.year')}-${$t('settings.other.dateFormat.month')}-${$t('settings.other.dateFormat.day')}` }}</option>
-									<option value="Y-D-M">{{ `${$t('settings.other.dateFormat.year')}-${$t('settings.other.dateFormat.day')}-${$t('settings.other.dateFormat.month')}` }}</option>
-									<option value="D-M-Y">{{ `${$t('settings.other.dateFormat.day')}-${$t('settings.other.dateFormat.month')}-${$t('settings.other.dateFormat.year')}` }}</option>
-									<option value="M-D-Y">{{ `${$t('settings.other.dateFormat.month')}-${$t('settings.other.dateFormat.day')}-${$t('settings.other.dateFormat.year')}` }}</option>
+									<option value="Y-M-D">
+										{{
+											`${$t('settings.other.dateFormat.year')}-${$t('settings.other.dateFormat.month')}-${$t(
+												'settings.other.dateFormat.day'
+											)}`
+										}}
+									</option>
+									<option value="Y-D-M">
+										{{
+											`${$t('settings.other.dateFormat.year')}-${$t('settings.other.dateFormat.day')}-${$t(
+												'settings.other.dateFormat.month'
+											)}`
+										}}
+									</option>
+									<option value="D-M-Y">
+										{{
+											`${$t('settings.other.dateFormat.day')}-${$t('settings.other.dateFormat.month')}-${$t(
+												'settings.other.dateFormat.year'
+											)}`
+										}}
+									</option>
+									<option value="M-D-Y">
+										{{
+											`${$t('settings.other.dateFormat.month')}-${$t('settings.other.dateFormat.day')}-${$t(
+												'settings.other.dateFormat.year'
+											)}`
+										}}
+									</option>
 									<option value="Y">{{ $t('settings.other.dateFormat.year') }}</option>
 								</select>
 							</div>
@@ -804,7 +1126,14 @@
 						<div class="form-grid-3">
 							<div class="input-field-group">
 								<span class="field-label">{{ $t('settings.covers.localArtworkSize') }}</span>
-								<input v-model.number="settings.localArtworkSize" max="10000" min="100" step="100" type="number" class="modern-input" />
+								<input
+									v-model.number="settings.localArtworkSize"
+									max="10000"
+									min="100"
+									step="100"
+									type="number"
+									class="modern-input"
+								/>
 								<p v-if="settings.localArtworkSize > 1200" class="input-warning-msg">
 									⚠️ {{ $t('settings.covers.imageSizeWarning') }}
 								</p>
@@ -812,7 +1141,14 @@
 
 							<div class="input-field-group">
 								<span class="field-label">{{ $t('settings.covers.embeddedArtworkSize') }}</span>
-								<input v-model.number="settings.embeddedArtworkSize" max="10000" min="100" step="100" type="number" class="modern-input" />
+								<input
+									v-model.number="settings.embeddedArtworkSize"
+									max="10000"
+									min="100"
+									step="100"
+									type="number"
+									class="modern-input"
+								/>
 								<p v-if="settings.embeddedArtworkSize > 1200" class="input-warning-msg">
 									⚠️ {{ $t('settings.covers.imageSizeWarning') }}
 								</p>
@@ -831,7 +1167,13 @@
 						<div class="form-grid-3">
 							<div class="input-field-group">
 								<span class="field-label">{{ $t('settings.covers.jpegImageQuality') }}</span>
-								<input v-model.number="settings.jpegImageQuality" max="100" min="1" type="number" class="modern-input" />
+								<input
+									v-model.number="settings.jpegImageQuality"
+									max="100"
+									min="1"
+									type="number"
+									class="modern-input"
+								/>
 							</div>
 
 							<label class="modern-toggle-item">
@@ -866,10 +1208,14 @@
 						<div class="banner-text">
 							<h4 class="banner-title">Download Directory Permission Warning</h4>
 							<p class="banner-desc">
-								The download folder (<code>{{ permissions.downloadLocation }}</code>) is <strong>NOT writable</strong> by the container process (UID: {{ permissions.uid }}, GID: {{ permissions.gid }}). Download tasks will fail!
+								The download folder (<code>{{ permissions.downloadLocation }}</code
+								>) is <strong>NOT writable</strong> by the container process (UID: {{ permissions.uid }}, GID:
+								{{ permissions.gid }}). Download tasks will fail!
 							</p>
 							<p class="banner-solution">
-								💡 <strong>Solution:</strong> Run <code>chmod -R 777 {{ permissions.downloadLocation }}</code> on your host, or start the container with environment variables <code>PUID</code> and <code>PGID</code> matching your host user (e.g. <code>PUID=1000 PGID=1000</code>).
+								💡 <strong>Solution:</strong> Run <code>chmod -R 777 {{ permissions.downloadLocation }}</code> on your
+								host, or start the container with environment variables <code>PUID</code> and <code>PGID</code> matching
+								your host user (e.g. <code>PUID=1000 PGID=1000</code>).
 							</p>
 						</div>
 					</div>
@@ -880,7 +1226,9 @@
 						<div class="banner-text">
 							<h4 class="banner-title">Container Permissions Healthy</h4>
 							<p class="banner-desc">
-								Download directory (<code>{{ permissions.downloadLocation }}</code>) and config directory (<code>{{ permissions.configFolder }}</code>) are both writable by process UID {{ permissions.uid }}.
+								Download directory (<code>{{ permissions.downloadLocation }}</code
+								>) and config directory (<code>{{ permissions.configFolder }}</code
+								>) are both writable by process UID {{ permissions.uid }}.
 							</p>
 						</div>
 					</div>
@@ -897,7 +1245,12 @@
 							<p class="card-subtitle">Real-time application event logs, permission diagnostics, and system trace</p>
 						</div>
 						<div class="terminal-header-controls">
-							<button class="btn btn-secondary btn-sm" title="Refresh Logs" :disabled="isLoadingLogs" @click="fetchLogs">
+							<button
+								class="btn btn-secondary btn-sm"
+								title="Refresh Logs"
+								:disabled="isLoadingLogs"
+								@click="fetchLogs"
+							>
 								<i class="material-icons btn-icon text-sm" :class="{ 'spin-active': isLoadingLogs }">sync</i>
 								<span>Refresh</span>
 							</button>
@@ -905,7 +1258,11 @@
 								<input v-model="logAutoRefresh" type="checkbox" class="modern-checkbox" />
 								<span>Auto-refresh</span>
 							</label>
-							<button class="btn btn-secondary btn-sm" title="Copy visible logs to clipboard" @click="copyLogsToClipboard">
+							<button
+								class="btn btn-secondary btn-sm"
+								title="Copy visible logs to clipboard"
+								@click="copyLogsToClipboard"
+							>
 								<i class="material-icons btn-icon text-sm">content_copy</i>
 								<span>Copy</span>
 							</button>
@@ -998,7 +1355,9 @@
 									<button v-if="log.meta" class="meta-toggle-btn" @click="toggleExpandLog(log.id)">
 										{{ expandedLogIds.includes(log.id) ? '▲ Hide trace' : '▼ Details' }}
 									</button>
-									<pre v-if="log.meta && expandedLogIds.includes(log.id)" class="log-trace-box">{{ JSON.stringify(log.meta, null, 2) }}</pre>
+									<pre v-if="log.meta && expandedLogIds.includes(log.id)" class="log-trace-box">{{
+										JSON.stringify(log.meta, null, 2)
+									}}</pre>
 								</div>
 							</div>
 						</div>
@@ -1026,6 +1385,192 @@
 				</div>
 			</div>
 		</footer>
+
+		<!-- How to Get Your ARL Quick Guide Modal -->
+		<div v-if="showArlModal" class="modal-backdrop" @click.self="showArlModal = false">
+			<div class="modal-card arl-guide-modal-card">
+				<!-- Modal Header -->
+				<div class="modal-header">
+					<div class="modal-header-main">
+						<div class="card-icon-box card-icon-amber">
+							<i class="material-icons">vpn_key</i>
+						</div>
+						<div class="modal-header-info">
+							<span class="modal-type-badge">TUTORIAL & QUICK CONNECT</span>
+							<h3 class="modal-album-title">
+								{{ $t('settings.arlHealth.guideModal.title') }}
+							</h3>
+							<p class="modal-album-artist">
+								{{ $t('settings.arlHealth.guideModal.subtitle') }}
+							</p>
+						</div>
+					</div>
+					<button type="button" class="modal-close-btn" title="Close (Esc)" @click="showArlModal = false">
+						<i class="material-icons">close</i>
+					</button>
+				</div>
+
+				<!-- Modal Body -->
+				<div class="modal-body space-y-5">
+					<!-- Interactive Browser Tabs -->
+					<div class="guide-tabs-row">
+						<button
+							type="button"
+							class="guide-tab-btn"
+							:class="{ 'guide-tab-btn--active': guideTab === 'chrome' }"
+							@click="guideTab = 'chrome'"
+						>
+							<i class="material-icons text-sm mr-1">tab</i>
+							{{ $t('settings.arlHealth.guideModal.tabs.chrome') }}
+						</button>
+						<button
+							type="button"
+							class="guide-tab-btn"
+							:class="{ 'guide-tab-btn--active': guideTab === 'firefox' }"
+							@click="guideTab = 'firefox'"
+						>
+							<i class="material-icons text-sm mr-1">tab</i>
+							{{ $t('settings.arlHealth.guideModal.tabs.firefox') }}
+						</button>
+						<button
+							type="button"
+							class="guide-tab-btn"
+							:class="{ 'guide-tab-btn--active': guideTab === 'safari' }"
+							@click="guideTab = 'safari'"
+						>
+							<i class="material-icons text-sm mr-1">extension</i>
+							{{ $t('settings.arlHealth.guideModal.tabs.safari') }}
+						</button>
+					</div>
+
+					<!-- 3-Step Visual Instructions -->
+					<div class="guide-steps-container">
+						<!-- Chrome / Chromium steps -->
+						<div v-show="guideTab === 'chrome'" class="steps-grid">
+							<div class="step-card">
+								<div class="step-badge">1</div>
+								<h4 class="step-title">{{ $t('settings.arlHealth.guideModal.chrome.step1Title') }}</h4>
+								<p class="step-desc">{{ $t('settings.arlHealth.guideModal.chrome.step1Desc') }}</p>
+							</div>
+							<div class="step-card">
+								<div class="step-badge">2</div>
+								<h4 class="step-title">{{ $t('settings.arlHealth.guideModal.chrome.step2Title') }}</h4>
+								<p class="step-desc">{{ $t('settings.arlHealth.guideModal.chrome.step2Desc') }}</p>
+							</div>
+							<div class="step-card">
+								<div class="step-badge">3</div>
+								<h4 class="step-title">{{ $t('settings.arlHealth.guideModal.chrome.step3Title') }}</h4>
+								<p class="step-desc">{{ $t('settings.arlHealth.guideModal.chrome.step3Desc') }}</p>
+							</div>
+						</div>
+
+						<!-- Firefox steps -->
+						<div v-show="guideTab === 'firefox'" class="steps-grid">
+							<div class="step-card">
+								<div class="step-badge">1</div>
+								<h4 class="step-title">{{ $t('settings.arlHealth.guideModal.firefox.step1Title') }}</h4>
+								<p class="step-desc">{{ $t('settings.arlHealth.guideModal.firefox.step1Desc') }}</p>
+							</div>
+							<div class="step-card">
+								<div class="step-badge">2</div>
+								<h4 class="step-title">{{ $t('settings.arlHealth.guideModal.firefox.step2Title') }}</h4>
+								<p class="step-desc">{{ $t('settings.arlHealth.guideModal.firefox.step2Desc') }}</p>
+							</div>
+							<div class="step-card">
+								<div class="step-badge">3</div>
+								<h4 class="step-title">{{ $t('settings.arlHealth.guideModal.firefox.step3Title') }}</h4>
+								<p class="step-desc">{{ $t('settings.arlHealth.guideModal.firefox.step3Desc') }}</p>
+							</div>
+						</div>
+
+						<!-- Safari / Extension steps -->
+						<div v-show="guideTab === 'safari'" class="steps-grid">
+							<div class="step-card">
+								<div class="step-badge">1</div>
+								<h4 class="step-title">{{ $t('settings.arlHealth.guideModal.safari.step1Title') }}</h4>
+								<p class="step-desc">{{ $t('settings.arlHealth.guideModal.safari.step1Desc') }}</p>
+							</div>
+							<div class="step-card">
+								<div class="step-badge">2</div>
+								<h4 class="step-title">{{ $t('settings.arlHealth.guideModal.safari.step2Title') }}</h4>
+								<p class="step-desc">{{ $t('settings.arlHealth.guideModal.safari.step2Desc') }}</p>
+							</div>
+							<div class="step-card">
+								<div class="step-badge">3</div>
+								<h4 class="step-title">{{ $t('settings.arlHealth.guideModal.safari.step3Title') }}</h4>
+								<p class="step-desc">{{ $t('settings.arlHealth.guideModal.safari.step3Desc') }}</p>
+							</div>
+						</div>
+					</div>
+
+					<!-- Helper Snippet & Cookie Name Box -->
+					<div class="helper-box">
+						<div class="helper-box-header">
+							<div class="flex-align-center gap-2">
+								<i class="material-icons text-cyan-400 text-sm">terminal</i>
+								<span class="helper-box-title">{{ $t('settings.arlHealth.guideModal.helperSnippet.title') }}</span>
+							</div>
+							<div class="flex-align-center gap-2">
+								<button type="button" class="btn btn-secondary btn-xs" @click="copyCookieName">
+									<i class="material-icons text-xs mr-1">content_copy</i>
+									{{ $t('settings.arlHealth.guideModal.helperSnippet.copyName') }}
+								</button>
+								<button type="button" class="btn btn-primary btn-xs" @click="copyConsoleSnippet">
+									<i class="material-icons text-xs mr-1">code</i>
+									{{ $t('settings.arlHealth.guideModal.helperSnippet.copySnippet') }}
+								</button>
+							</div>
+						</div>
+						<p class="helper-box-desc">{{ $t('settings.arlHealth.guideModal.helperSnippet.desc') }}</p>
+						<code class="helper-code-block">{{ consoleSnippetText }}</code>
+					</div>
+
+					<!-- Direct Paste & Connect Inside Modal -->
+					<div class="modal-connect-card">
+						<h4 class="connect-card-title">
+							<i class="material-icons text-sm text-emerald-400 mr-1">bolt</i>
+							{{ $t('settings.arlHealth.guideModal.quickConnect.title') }}
+						</h4>
+						<p class="connect-card-desc">{{ $t('settings.arlHealth.guideModal.quickConnect.desc') }}</p>
+						<div class="input-with-button">
+							<input
+								v-model="modalArlInput"
+								type="password"
+								class="modern-input"
+								:placeholder="$t('settings.arlHealth.guideModal.quickConnect.placeholder')"
+								@keyup.enter="connectFromModal"
+							/>
+							<button
+								type="button"
+								class="btn btn-primary"
+								:disabled="!modalArlInput || isConnectingModal"
+								@click="connectFromModal"
+							>
+								<i class="material-icons btn-icon text-sm" :class="{ 'spin-animation': isConnectingModal }">
+									{{ isConnectingModal ? 'sync' : 'login' }}
+								</i>
+								<span>{{
+									isConnectingModal
+										? $t('settings.arlHealth.guideModal.quickConnect.connecting')
+										: $t('settings.arlHealth.guideModal.quickConnect.connect')
+								}}</span>
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Modal Footer -->
+				<div class="modal-footer">
+					<router-link :to="{ name: 'ARL' }" class="modern-link-inline mr-auto">
+						<i class="material-icons text-sm mr-1">menu_book</i>
+						Open Full Visual Guide Page
+					</router-link>
+					<button type="button" class="btn btn-secondary" @click="showArlModal = false">
+						{{ $t('settings.arlHealth.guideModal.close') }}
+					</button>
+				</div>
+			</div>
+		</div>
 	</div>
 </template>
 
@@ -1085,7 +1630,27 @@ export default {
 			spotifyUser: '',
 			accountNum: 0,
 			accounts: [],
-			trackTemplateVariables
+			trackTemplateVariables,
+			arlHealth: {
+				valid: false,
+				hasArl: false,
+				source: 'none',
+				tier: 'unknown',
+				canStreamLossless: false,
+				canStreamHq: false,
+				arlUpdatedAt: null,
+				estimatedTotalDays: 90,
+				estimatedRemainingDays: null,
+				expiringSoon: false,
+				deezerReachable: undefined
+			},
+			isVerifyingArl: false,
+			showArlText: false,
+			showArlModal: false,
+			guideTab: 'chrome',
+			modalArlInput: '',
+			isConnectingModal: false,
+			consoleSnippetText: `copy(document.cookie.split('; ').find(r => r.startsWith('arl='))?.split('=')[1] || '')`
 		}
 	},
 	computed: {
@@ -1099,7 +1664,7 @@ export default {
 			hasSlimDownloads: 'getSlimDownloads',
 			hasSlimSidebar: 'getSlimSidebar',
 			showBitrateTags: 'getShowBitrateTags',
-			showSearchButton: 'getShowSearchButton',
+			showSearchButton: 'getShowSearchButton'
 		}),
 		needToWait() {
 			return Object.keys(this.getSettings).length === 0
@@ -1149,13 +1714,89 @@ export default {
 			return `https://e-cdns-images.dzcdn.net/images/user/${this.user.picture}/125x125-000000-80-0-0.jpg`
 		},
 		userLicense() {
-			if (this.user.can_stream_lossless) return "Hi-Fi"
-			else if (this.user.can_stream_hq) return "Premium"
-			else return "Free"
+			if (this.user.can_stream_lossless) return 'Hi-Fi'
+			else if (this.user.can_stream_hq) return 'Premium'
+			else return 'Free'
+		},
+		healthIcon() {
+			if (!this.arlHealth.valid) return 'cancel'
+			if (this.arlHealth.expiringSoon) return 'warning'
+			return 'verified_user'
+		},
+		healthIconBoxClass() {
+			if (!this.arlHealth.valid) return 'card-icon-rose'
+			if (this.arlHealth.expiringSoon) return 'card-icon-amber'
+			return 'card-icon-emerald'
+		},
+		healthStatusPillClass() {
+			if (!this.arlHealth.valid) return 'status-pill--expired'
+			if (this.arlHealth.expiringSoon) return 'status-pill--warning'
+			return 'status-pill--active'
+		},
+		healthStatusText() {
+			if (!this.arlHealth.valid) return this.$t('settings.arlHealth.expired')
+			if (this.arlHealth.expiringSoon) return this.$t('settings.arlHealth.expiringSoon')
+			return this.$t('settings.arlHealth.active')
+		},
+		tierIcon() {
+			if (this.arlHealth.tier === 'hifi') return 'album'
+			if (this.arlHealth.tier === 'premium') return 'audiotrack'
+			if (this.arlHealth.tier === 'free') return 'music_note'
+			return 'help_outline'
+		},
+		tierBadgeText() {
+			if (this.arlHealth.tier === 'hifi') return this.$t('settings.arlHealth.tier.hifi')
+			if (this.arlHealth.tier === 'premium') return this.$t('settings.arlHealth.tier.premium')
+			if (this.arlHealth.tier === 'free') return this.$t('settings.arlHealth.tier.free')
+			return this.$t('settings.arlHealth.tier.unknown')
+		},
+		sourceBadgeText() {
+			if (this.arlHealth.source === 'env') return this.$t('settings.arlHealth.source.env')
+			if (this.arlHealth.source === 'saved') return this.$t('settings.arlHealth.source.saved')
+			if (this.arlHealth.source === 'session') return this.$t('settings.arlHealth.source.session')
+			return this.$t('settings.arlHealth.source.none')
+		},
+		sessionProgressPercent() {
+			if (this.arlHealth.estimatedRemainingDays !== null) {
+				return Math.max(0, Math.min(100, Math.round((this.arlHealth.estimatedRemainingDays / 90) * 100)))
+			}
+			return this.arlHealth.valid ? 100 : 0
+		},
+		sessionProgressColorClass() {
+			if (!this.arlHealth.valid) return 'fill-rose'
+			if (this.arlHealth.expiringSoon) return 'fill-rose'
+			if (this.arlHealth.estimatedRemainingDays !== null && this.arlHealth.estimatedRemainingDays <= 30)
+				return 'fill-amber'
+			return 'fill-emerald'
+		},
+		sessionLifeText() {
+			if (!this.arlHealth.valid) return this.$t('settings.arlHealth.sessionLife.noSession')
+			if (this.arlHealth.estimatedRemainingDays !== null) {
+				return this.$t('settings.arlHealth.sessionLife.daysRemaining', {
+					days: this.arlHealth.estimatedRemainingDays,
+					total: 90
+				})
+			}
+			return this.$t('settings.arlHealth.sessionLife.unknown')
+		},
+		formattedArlDate() {
+			if (this.arlHealth.arlUpdatedAt) {
+				return new Date(this.arlHealth.arlUpdatedAt).toLocaleDateString(undefined, {
+					year: 'numeric',
+					month: 'short',
+					day: 'numeric',
+					hour: '2-digit',
+					minute: '2-digit'
+				})
+			}
+			return null
 		}
 	},
 	watch: {
 		currentTab(newTab) {
+			if (newTab === 'account') {
+				this.fetchArlHealth()
+			}
 			if (newTab === 'logs') {
 				this.fetchLogs()
 				this.fetchPermissions()
@@ -1208,10 +1849,22 @@ export default {
 			this.fetchPermissions()
 		}
 
+		this.fetchArlHealth()
+
+		this.escListener = e => {
+			if (e.key === 'Escape' && this.showArlModal) {
+				this.showArlModal = false
+			}
+		}
+		window.addEventListener('keydown', this.escListener)
+
 		this.$on('hook:destroyed', () => {
 			socket.off('updateSettings')
 			socket.off('familyAccounts')
 			this.stopAutoRefresh()
+			if (this.escListener) {
+				window.removeEventListener('keydown', this.escListener)
+			}
 		})
 	},
 	methods: {
@@ -1242,15 +1895,56 @@ export default {
 			this.spotifyUser = (' ' + this.lastUser).slice(1)
 		},
 		copyARLtoClipboard() {
-			const copyText = this.$refs.loginInput
-
-			copyText.setAttribute('type', 'text')
-			copyText.select()
-			copyText.setSelectionRange(0, 99999)
-			document.execCommand('copy')
-			copyText.setAttribute('type', 'password')
-
+			const arlVal = (this.$refs.loginInput && this.$refs.loginInput.value) || this.arl || ''
+			copyToClipboard(arlVal)
 			toast(this.$t('settings.toasts.ARLcopied'), 'assignment')
+		},
+		async fetchArlHealth(verify = false) {
+			if (verify) this.isVerifyingArl = true
+			try {
+				const params = verify ? { verify: 'true' } : {}
+				const data = await fetchData('arlHealth', params)
+				if (data) {
+					this.arlHealth = { ...this.arlHealth, ...data }
+					if (verify) {
+						if (data.deezerReachable) {
+							toast(this.$t('settings.toasts.sessionVerified'), 'cloud_done', true)
+						} else {
+							toast(this.$t('settings.toasts.sessionVerifyFailed'), 'cloud_off', true)
+						}
+					}
+				}
+			} catch (err) {
+				console.error('Failed to fetch ARL health diagnostics:', err)
+				if (verify) {
+					toast(this.$t('settings.toasts.sessionVerifyFailed'), 'error', true)
+				}
+			} finally {
+				this.isVerifyingArl = false
+			}
+		},
+		verifyArlHealth() {
+			this.fetchArlHealth(true)
+		},
+		copyCookieName() {
+			copyToClipboard('arl')
+			toast(this.$t('settings.toasts.cookieNameCopied'), 'assignment')
+		},
+		copyConsoleSnippet() {
+			copyToClipboard(this.consoleSnippetText)
+			toast(this.$t('settings.toasts.snippetCopied'), 'code')
+		},
+		async connectFromModal() {
+			if (!this.modalArlInput || !this.modalArlInput.trim()) return
+			this.isConnectingModal = true
+			try {
+				await this.login(this.modalArlInput.trim(), true)
+				this.showArlModal = false
+				this.modalArlInput = ''
+				await this.fetchArlHealth()
+			} finally {
+				this.isConnectingModal = false
+			}
 		},
 		changeLocale(newLocale) {
 			this.$i18n.locale = newLocale
@@ -1320,6 +2014,7 @@ export default {
 				case -1:
 					toast(this.$t('toasts.deezerNotAvailable'), 'close', true, 'login-toast')
 			}
+			this.fetchArlHealth()
 		},
 		loginButton() {
 			const newArl = this.$refs.loginInput.value.trim()
@@ -1362,6 +2057,7 @@ export default {
 			this.accountNum = accountNum
 
 			localStorage.setItem('accountNum', this.accountNum)
+			this.fetchArlHealth()
 		},
 		initAccounts(accounts) {
 			this.accounts = accounts
@@ -1372,6 +2068,7 @@ export default {
 			if (result.logged_out) {
 				toast(this.$t('toasts.loggedOut'), 'done', true, 'login-toast')
 				this.dispatchLogout()
+				this.fetchArlHealth()
 			}
 		},
 		initSettings(settings, credentials) {
@@ -1397,12 +2094,13 @@ export default {
 			this.settings = JSON.parse(JSON.stringify(this.defaultSettings))
 			toast(this.$t('settings.toasts.reset'), 'settings')
 		},
-		canDownload(bitrate){
+		canDownload(bitrate) {
 			if (!this.user.id) return false
 			if (this.settings.feelingLucky) return true
-			if (this.user.id && bitrate == 1) return true
-			if (this.user.can_stream_hq && bitrate == 3) return true
-			if (this.user.can_stream_lossless && bitrate == 9) return true
+			const b = Number(bitrate)
+			if (this.user.id && b === 1) return true
+			if (this.user.can_stream_hq && b === 3) return true
+			if (this.user.can_stream_lossless && b === 9) return true
 			return false
 		},
 		async fetchLogs() {
@@ -2299,9 +2997,15 @@ export default {
 	font-size: 2rem;
 }
 
-.banner-ok .banner-icon { color: #22c55e; }
-.banner-warn .banner-icon { color: #eab308; }
-.banner-error .banner-icon { color: #ef4444; }
+.banner-ok .banner-icon {
+	color: #22c55e;
+}
+.banner-warn .banner-icon {
+	color: #eab308;
+}
+.banner-error .banner-icon {
+	color: #ef4444;
+}
 
 .banner-content {
 	flex: 1;
@@ -2523,9 +3227,15 @@ export default {
 	border-radius: 50%;
 }
 
-.dot-red { background: #ef4444; }
-.dot-yellow { background: #eab308; }
-.dot-green { background: #22c55e; }
+.dot-red {
+	background: #ef4444;
+}
+.dot-yellow {
+	background: #eab308;
+}
+.dot-green {
+	background: #22c55e;
+}
 
 .window-title {
 	font-size: 0.75rem;
@@ -2671,5 +3381,536 @@ export default {
 	color: #cbd5e1;
 	overflow-x: auto;
 	margin: 0.25rem 0;
+}
+
+/* Spin animation */
+@keyframes spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.spin-animation {
+	animation: spin 1s linear infinite;
+}
+
+/* ARL Health Card & Header */
+.arl-health-card {
+	border-color: rgba(6, 182, 212, 0.2);
+}
+
+.arl-health-header {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	padding: 1.25rem 1.5rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+	background: rgba(30, 41, 59, 0.35);
+}
+
+.header-actions-end {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-left: auto;
+}
+
+.health-status-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-size: 0.725rem;
+	font-weight: 700;
+	padding: 0.2rem 0.65rem;
+	border-radius: 9999px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.health-status-pill .status-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 9999px;
+}
+
+.status-pill--active {
+	background: rgba(16, 185, 129, 0.15);
+	color: #34d399;
+	border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.status-pill--active .status-dot {
+	background: #10b981;
+	box-shadow: 0 0 6px #10b981;
+}
+
+.status-pill--warning {
+	background: rgba(245, 158, 11, 0.15);
+	color: #fbbf24;
+	border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.status-pill--warning .status-dot {
+	background: #f59e0b;
+	box-shadow: 0 0 6px #f59e0b;
+}
+
+.status-pill--expired {
+	background: rgba(244, 63, 94, 0.15);
+	color: #fb7185;
+	border: 1px solid rgba(244, 63, 94, 0.35);
+}
+
+.status-pill--expired .status-dot {
+	background: #f43f5e;
+	box-shadow: 0 0 6px #f43f5e;
+}
+
+.health-reachability-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	font-size: 0.725rem;
+	font-weight: 600;
+	padding: 0.2rem 0.55rem;
+	border-radius: 9999px;
+}
+
+.reachability-online {
+	background: rgba(16, 185, 129, 0.12);
+	color: #34d399;
+	border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.reachability-offline {
+	background: rgba(244, 63, 94, 0.12);
+	color: #fb7185;
+	border: 1px solid rgba(244, 63, 94, 0.25);
+}
+
+/* Health Metrics Grid */
+.health-metrics-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	gap: 1.25rem;
+}
+
+.health-metric-box {
+	background: rgba(30, 41, 59, 0.35);
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	border-radius: 0.75rem;
+	padding: 1.25rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.metric-label {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-size: 0.75rem;
+	font-weight: 700;
+	color: #94a3b8;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.metric-value-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.quality-tier-badge {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-size: 1.05rem;
+	font-weight: 700;
+	padding: 0.35rem 0.85rem;
+	border-radius: 0.5rem;
+}
+
+.capability-pills-row {
+	display: flex;
+	gap: 0.45rem;
+	flex-wrap: wrap;
+	margin-top: 0.25rem;
+}
+
+.cap-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.3rem;
+	font-size: 0.75rem;
+	font-weight: 500;
+	padding: 0.2rem 0.55rem;
+	border-radius: 0.375rem;
+	background: rgba(15, 23, 42, 0.5);
+	color: #64748b;
+	border: 1px solid rgba(255, 255, 255, 0.05);
+	transition: all 0.2s ease;
+}
+
+.cap-pill--enabled {
+	color: #34d399;
+	background: rgba(16, 185, 129, 0.1);
+	border-color: rgba(16, 185, 129, 0.3);
+}
+
+.session-days-text {
+	font-size: 1.15rem;
+	font-weight: 700;
+	color: #f8fafc;
+}
+
+.source-tag {
+	font-size: 0.725rem;
+	font-weight: 600;
+	padding: 0.15rem 0.5rem;
+	border-radius: 0.375rem;
+	background: rgba(59, 130, 246, 0.12);
+	color: #60a5fa;
+	border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.session-progress-wrapper {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.session-progress-bar {
+	flex: 1;
+	height: 8px;
+	border-radius: 9999px;
+	background: rgba(15, 23, 42, 0.7);
+	overflow: hidden;
+	border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.session-progress-fill {
+	height: 100%;
+	border-radius: 9999px;
+	transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fill-emerald {
+	background: linear-gradient(90deg, #10b981, #34d399);
+}
+
+.fill-amber {
+	background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.fill-rose {
+	background: linear-gradient(90deg, #ef4444, #f43f5e);
+}
+
+.progress-percent-label {
+	font-size: 0.8rem;
+	font-weight: 700;
+	color: #94a3b8;
+	min-width: 36px;
+	text-align: right;
+}
+
+.session-meta-note {
+	font-size: 0.75rem;
+	color: #64748b;
+	display: flex;
+	align-items: center;
+	line-height: 1.4;
+}
+
+.btn-link-reset {
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	text-decoration: none;
+	font: inherit;
+	color: inherit;
+}
+
+.btn-xs {
+	padding: 0.25rem 0.55rem;
+	font-size: 0.75rem;
+	border-radius: 0.375rem;
+}
+
+/* Modal Window Styles */
+.modal-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.8);
+	backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
+	z-index: 99999;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1.5rem;
+}
+
+.modal-card {
+	background: rgba(15, 23, 42, 0.95);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	border-radius: 1.25rem;
+	width: 100%;
+	max-height: 90vh;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+	animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.arl-guide-modal-card {
+	max-width: 46rem;
+}
+
+@keyframes modalPop {
+	from {
+		opacity: 0;
+		transform: scale(0.96) translateY(8px);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+}
+
+.modal-header {
+	padding: 1.25rem 1.5rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1.5rem;
+	background: rgba(30, 41, 59, 0.35);
+}
+
+.modal-header-main {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	flex: 1;
+	min-width: 0;
+}
+
+.modal-header-info {
+	flex: 1;
+	min-width: 0;
+}
+
+.modal-type-badge {
+	font-size: 0.6875rem;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	color: #06b6d4;
+	text-transform: uppercase;
+}
+
+.modal-album-title {
+	font-size: 1.25rem;
+	font-weight: 700;
+	color: #f8fafc;
+	margin: 0.15rem 0 0.25rem 0;
+}
+
+.modal-album-artist {
+	font-size: 0.825rem;
+	color: #94a3b8;
+	margin: 0;
+}
+
+.modal-close-btn {
+	background: transparent;
+	border: none;
+	color: #94a3b8;
+	cursor: pointer;
+	padding: 0.4rem;
+	border-radius: 0.5rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.15s ease;
+}
+
+.modal-close-btn:hover {
+	background: rgba(255, 255, 255, 0.08);
+	color: #f8fafc;
+}
+
+.modal-body {
+	padding: 1.5rem;
+	overflow-y: auto;
+	flex: 1;
+}
+
+.modal-footer {
+	padding: 1rem 1.5rem;
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	background: rgba(30, 41, 59, 0.35);
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+}
+
+/* Guide Tabs & Steps */
+.guide-tabs-row {
+	display: flex;
+	gap: 0.5rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	padding-bottom: 0.75rem;
+	overflow-x: auto;
+}
+
+.guide-tab-btn {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.5rem 0.85rem;
+	border-radius: 0.5rem;
+	border: 1px solid transparent;
+	background: transparent;
+	color: #94a3b8;
+	font-size: 0.825rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.15s ease;
+	white-space: nowrap;
+}
+
+.guide-tab-btn:hover {
+	color: #f8fafc;
+	background: rgba(255, 255, 255, 0.05);
+}
+
+.guide-tab-btn--active {
+	color: #06b6d4;
+	background: rgba(6, 182, 212, 0.12);
+	border-color: rgba(6, 182, 212, 0.35);
+}
+
+.steps-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 0.85rem;
+}
+
+.step-card {
+	background: rgba(30, 41, 59, 0.45);
+	border: 1px solid rgba(255, 255, 255, 0.07);
+	border-radius: 0.75rem;
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.step-badge {
+	width: 1.75rem;
+	height: 1.75rem;
+	border-radius: 9999px;
+	background: rgba(6, 182, 212, 0.2);
+	color: #06b6d4;
+	font-weight: 800;
+	font-size: 0.8rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid rgba(6, 182, 212, 0.4);
+}
+
+.step-title {
+	font-size: 0.9rem;
+	font-weight: 700;
+	color: #f8fafc;
+	margin: 0;
+}
+
+.step-desc {
+	font-size: 0.8rem;
+	color: #94a3b8;
+	margin: 0;
+	line-height: 1.45;
+}
+
+/* Helper Console Box */
+.helper-box {
+	background: rgba(15, 23, 42, 0.6);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 0.75rem;
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.helper-box-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.helper-box-title {
+	font-size: 0.85rem;
+	font-weight: 700;
+	color: #f8fafc;
+}
+
+.helper-box-desc {
+	font-size: 0.775rem;
+	color: #94a3b8;
+	margin: 0;
+}
+
+.helper-code-block {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 0.75rem;
+	background: rgba(0, 0, 0, 0.5);
+	padding: 0.5rem 0.75rem;
+	border-radius: 0.4rem;
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	color: #38bdf8;
+	word-break: break-all;
+	overflow-x: auto;
+}
+
+/* Modal Connect Card */
+.modal-connect-card {
+	background: rgba(30, 41, 59, 0.35);
+	border: 1px solid rgba(255, 255, 255, 0.07);
+	border-radius: 0.75rem;
+	padding: 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.connect-card-title {
+	font-size: 0.9rem;
+	font-weight: 700;
+	color: #f8fafc;
+	margin: 0;
+	display: flex;
+	align-items: center;
+}
+
+.connect-card-desc {
+	font-size: 0.775rem;
+	color: #94a3b8;
+	margin: 0;
 }
 </style>
