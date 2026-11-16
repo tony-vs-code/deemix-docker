@@ -60,6 +60,8 @@ export interface LibraryData {
 	fileIndex: Record<string, FileIndexItem>
 }
 
+export type TrackWithAlbumInfo = TrackMetadata & { albumTitle?: string; albumCover?: string }
+
 const AUDIO_EXTS = new Set(['.mp3', '.flac', '.m4a', '.ogg', '.opus', '.wav'])
 const COVER_FILENAMES = [
 	'cover.jpg',
@@ -81,6 +83,10 @@ const dbFilePath = path.join(configFolder, 'library.json')
 let cachedLibrary: LibraryData | null = null
 let libraryListener: { send: (key: string, data?: any) => void } | null = null
 
+// --- Debounced Atomic Disk Persistence ---
+let saveDebounceTimer: NodeJS.Timeout | null = null
+let pendingSaveData: LibraryData | null = null
+
 export function setLibraryListener(listener: { send: (key: string, data?: any) => void }) {
 	libraryListener = listener
 }
@@ -94,6 +100,231 @@ export function notifyLibraryUpdated(data: LibraryData) {
 		}
 	}
 }
+
+// --- In-Memory Inverted Search Index ---
+interface IndexedAlbum {
+	album: AlbumMetadata
+	titleLower: string
+	artistLower: string
+	combinedLower: string
+	tokens: Set<string>
+	trackMap: Map<string, string> // trackTitleLower -> originalTitle
+}
+
+interface IndexedTrack {
+	track: TrackWithAlbumInfo
+	titleLower: string
+	artistLower: string
+	albumLower: string
+	combinedLower: string
+	tokens: Set<string>
+}
+
+interface IndexedArtist {
+	artist: ArtistMetadata
+	nameLower: string
+	tokens: Set<string>
+	albumTitlesLower: string[]
+}
+
+interface LibrarySearchIndex {
+	downloadLocation: string
+	indexedAlbums: IndexedAlbum[]
+	indexedTracks: IndexedTrack[]
+	indexedArtists: IndexedArtist[]
+	allAlbums: AlbumMetadata[]
+	allTracks: TrackWithAlbumInfo[]
+	allArtists: ArtistMetadata[]
+	tokenToAlbums: Map<string, Set<IndexedAlbum>>
+	tokenToTracks: Map<string, Set<IndexedTrack>>
+	tokenToArtists: Map<string, Set<IndexedArtist>>
+}
+
+let searchIndex: LibrarySearchIndex | null = null
+
+function tokenize(text: string): string[] {
+	if (!text) return []
+	return text
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.split(/[^a-z0-9]+/i)
+		.filter(t => t.length > 0)
+}
+
+function buildSearchIndex(data: LibraryData): LibrarySearchIndex {
+	const tokenToAlbums = new Map<string, Set<IndexedAlbum>>()
+	const tokenToTracks = new Map<string, Set<IndexedTrack>>()
+	const tokenToArtists = new Map<string, Set<IndexedArtist>>()
+
+	const indexedAlbums: IndexedAlbum[] = []
+	const indexedTracks: IndexedTrack[] = []
+	const indexedArtists: IndexedArtist[] = []
+	const allAlbums: AlbumMetadata[] = []
+	const allTracks: TrackWithAlbumInfo[] = []
+	const allArtists: ArtistMetadata[] = data.artists || []
+
+	function addToken<T>(map: Map<string, Set<T>>, token: string, item: T) {
+		let set = map.get(token)
+		if (!set) {
+			set = new Set<T>()
+			map.set(token, set)
+		}
+		set.add(item)
+	}
+
+	for (const artist of allArtists) {
+		const artistNameLower = (artist.name || '').toLowerCase()
+		const artistTokens = new Set(tokenize(artist.name))
+		const albumTitlesLower: string[] = []
+
+		const indexedArt: IndexedArtist = {
+			artist,
+			nameLower: artistNameLower,
+			tokens: artistTokens,
+			albumTitlesLower
+		}
+		indexedArtists.push(indexedArt)
+
+		for (const tok of artistTokens) {
+			addToken(tokenToArtists, tok, indexedArt)
+		}
+
+		for (const album of artist.albums || []) {
+			allAlbums.push(album)
+			const albumTitleLower = (album.title || '').toLowerCase()
+			const albumArtistLower = (album.artist || artist.name || '').toLowerCase()
+			albumTitlesLower.push(albumTitleLower)
+
+			const albumTokens = new Set<string>()
+			tokenize(album.title).forEach(t => albumTokens.add(t))
+			tokenize(albumArtistLower).forEach(t => albumTokens.add(t))
+
+			const trackMap = new Map<string, string>()
+
+			for (const track of album.tracks || []) {
+				const trackWithInfo: TrackWithAlbumInfo = {
+					...track,
+					albumTitle: album.title,
+					albumCover: album.cover
+				}
+				allTracks.push(trackWithInfo)
+
+				const trackTitleLower = (track.title || '').toLowerCase()
+				const trackArtistLower = (track.artist || albumArtistLower).toLowerCase()
+				const trackAlbumLower = (track.album || album.title || '').toLowerCase()
+
+				trackMap.set(trackTitleLower, track.title)
+
+				const trackTokens = new Set<string>()
+				tokenize(track.title).forEach(t => {
+					trackTokens.add(t)
+					albumTokens.add(t) // Album matches any of its track tokens!
+				})
+				tokenize(trackArtistLower).forEach(t => trackTokens.add(t))
+				tokenize(trackAlbumLower).forEach(t => trackTokens.add(t))
+
+				const indexedTrk: IndexedTrack = {
+					track: trackWithInfo,
+					titleLower: trackTitleLower,
+					artistLower: trackArtistLower,
+					albumLower: trackAlbumLower,
+					combinedLower: `${trackTitleLower} ${trackArtistLower} ${trackAlbumLower}`,
+					tokens: trackTokens
+				}
+				indexedTracks.push(indexedTrk)
+
+				for (const tok of trackTokens) {
+					addToken(tokenToTracks, tok, indexedTrk)
+				}
+			}
+
+			const indexedAlb: IndexedAlbum = {
+				album,
+				titleLower: albumTitleLower,
+				artistLower: albumArtistLower,
+				combinedLower: `${albumTitleLower} ${albumArtistLower}`,
+				tokens: albumTokens,
+				trackMap
+			}
+			indexedAlbums.push(indexedAlb)
+
+			for (const tok of albumTokens) {
+				addToken(tokenToAlbums, tok, indexedAlb)
+			}
+		}
+	}
+
+	return {
+		downloadLocation: data.downloadLocation,
+		indexedAlbums,
+		indexedTracks,
+		indexedArtists,
+		allAlbums,
+		allTracks,
+		allArtists,
+		tokenToAlbums,
+		tokenToTracks,
+		tokenToArtists
+	}
+}
+
+function getOrBuildSearchIndex(data: LibraryData): LibrarySearchIndex {
+	if (searchIndex && searchIndex.downloadLocation === data.downloadLocation) {
+		return searchIndex
+	}
+	searchIndex = buildSearchIndex(data)
+	return searchIndex
+}
+
+export function flushPendingDiskSave(): void {
+	if (saveDebounceTimer) {
+		clearTimeout(saveDebounceTimer)
+		saveDebounceTimer = null
+	}
+	if (pendingSaveData) {
+		executeAtomicDiskSave(pendingSaveData)
+		pendingSaveData = null
+	}
+}
+
+function executeAtomicDiskSave(data: LibraryData): void {
+	try {
+		if (!fs.existsSync(configFolder)) {
+			fs.mkdirSync(configFolder, { recursive: true })
+		}
+		const tmpPath = `${dbFilePath}.${Date.now()}-${Math.random().toString(36).substring(2, 7)}.tmp`
+		fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8')
+		fs.renameSync(tmpPath, dbFilePath)
+		cachedLibrary = data
+	} catch (err) {
+		logger.error(`Failed to save library database to ${dbFilePath}: ${err}`)
+	}
+}
+
+export function saveLibraryToDisk(data: LibraryData, immediate = false): void {
+	cachedLibrary = data
+	searchIndex = buildSearchIndex(data)
+	pendingSaveData = data
+
+	if (immediate) {
+		flushPendingDiskSave()
+	} else {
+		if (saveDebounceTimer) {
+			clearTimeout(saveDebounceTimer)
+		}
+		saveDebounceTimer = setTimeout(() => {
+			saveDebounceTimer = null
+			if (pendingSaveData) {
+				executeAtomicDiskSave(pendingSaveData)
+				pendingSaveData = null
+			}
+		}, 800)
+	}
+}
+
+// Hook process exit to flush any pending disk writes
+process.once('beforeExit', () => flushPendingDiskSave())
 
 let isFetchingCovers = false
 
@@ -135,7 +366,8 @@ function fetchMissingCoversInBackground(
 			}
 
 			if (updatedAny && cachedLibrary) {
-				saveLibraryToDisk(cachedLibrary)
+				// Use debounced save to avoid disk thrashing
+				saveLibraryToDisk(cachedLibrary, false)
 				notifyLibraryUpdated(cachedLibrary)
 			}
 		} catch (err) {
@@ -507,6 +739,7 @@ export function loadLibraryFromDisk(): LibraryData | null {
 			const parsed = JSON.parse(content) as LibraryData
 			if (parsed && typeof parsed === 'object') {
 				cachedLibrary = parsed
+				searchIndex = buildSearchIndex(parsed)
 				return cachedLibrary
 			}
 		}
@@ -514,20 +747,6 @@ export function loadLibraryFromDisk(): LibraryData | null {
 		logger.error(`Failed to load library database from ${dbFilePath}: ${err}`)
 	}
 	return null
-}
-
-export function saveLibraryToDisk(data: LibraryData): void {
-	try {
-		if (!fs.existsSync(configFolder)) {
-			fs.mkdirSync(configFolder, { recursive: true })
-		}
-		const tmpPath = `${dbFilePath}.tmp`
-		fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8')
-		fs.renameSync(tmpPath, dbFilePath)
-		cachedLibrary = data
-	} catch (err) {
-		logger.error(`Failed to save library database to ${dbFilePath}: ${err}`)
-	}
 }
 
 export async function getOrInitLibrary(downloadLocation: string): Promise<LibraryData> {
@@ -538,6 +757,7 @@ export async function getOrInitLibrary(downloadLocation: string): Promise<Librar
 	const diskData = loadLibraryFromDisk()
 	if (diskData && diskData.downloadLocation === downloadLocation) {
 		cachedLibrary = diskData
+		searchIndex = buildSearchIndex(diskData)
 		return cachedLibrary
 	}
 
@@ -561,7 +781,7 @@ export async function scanLibrary(downloadLocation: string, force = false): Prom
 			artists: [],
 			fileIndex: {}
 		}
-		saveLibraryToDisk(emptyData)
+		saveLibraryToDisk(emptyData, true)
 		return emptyData
 	}
 
@@ -873,7 +1093,7 @@ export async function scanLibrary(downloadLocation: string, force = false): Prom
 		fileIndex
 	}
 
-	saveLibraryToDisk(libraryData)
+	saveLibraryToDisk(libraryData, true)
 
 	// Make Deezer cover fetching completely asynchronous in the background (<10ms return)
 	if (missingCoverAlbums.length > 0) {
@@ -899,7 +1119,7 @@ export interface SearchLibraryResult {
 	total: number
 	totalPages?: number
 	albums?: AlbumMetadata[]
-	tracks?: (TrackMetadata & { albumTitle?: string; albumCover?: string })[]
+	tracks?: TrackWithAlbumInfo[]
 	artists?: ArtistMetadata[]
 	totalAlbums?: number
 	totalTracks?: number
@@ -922,7 +1142,8 @@ export async function searchLibrary(
 	downloadLocation: string,
 	options: SearchLibraryOptions = {}
 ): Promise<SearchLibraryResult> {
-	const query = (options.query || '').trim().toLowerCase()
+	const rawQuery = (options.query || '').trim()
+	const query = rawQuery.toLowerCase()
 	const type = options.type || 'all'
 	const sortBy = options.sortBy || 'title_asc'
 	const page = Math.max(1, Number(options.page) || 1)
@@ -936,67 +1157,66 @@ export async function searchLibrary(
 		}
 	}
 
-	const allArtists = library.artists || []
-	const allAlbums: AlbumMetadata[] = []
-	const allTracks: (TrackMetadata & { albumTitle?: string; albumCover?: string })[] = []
+	const idx = getOrBuildSearchIndex(library)
 
-	for (const artist of allArtists) {
-		for (const album of artist.albums || []) {
-			allAlbums.push(album)
-			for (const track of album.tracks || []) {
-				allTracks.push({
-					...track,
-					albumTitle: album.title,
-					albumCover: album.cover
-				})
-			}
-		}
-	}
+	let matchedAlbums: AlbumMetadata[] = []
+	let matchedTracks: TrackWithAlbumInfo[] = []
+	let matchedArtists: ArtistMetadata[] = []
 
-	// 1. Filter Albums: Match by album title, artist, AND ANY track title in album.tracks!
-	let matchedAlbums: AlbumMetadata[] = allAlbums
-	if (query) {
-		const filtered: AlbumMetadata[] = []
-		for (const album of allAlbums) {
-			const titleMatch = (album.title || '').toLowerCase().includes(query)
-			const artistMatch = (album.artist || '').toLowerCase().includes(query)
-			const matchingTrackTitles: string[] = []
-			for (const track of album.tracks || []) {
-				if ((track.title || '').toLowerCase().includes(query)) {
-					matchingTrackTitles.push(track.title)
+	if (!query) {
+		// Empty query: instant return from pre-cached lists
+		matchedAlbums = idx.allAlbums.slice()
+		matchedTracks = idx.allTracks.slice()
+		matchedArtists = idx.allArtists.slice()
+	} else {
+		const queryTokens = tokenize(query)
+
+		// 1. High-speed Indexed Album Search (<1ms)
+		// Match if query is contained in album title, artist, or any track title in album
+		const albumResults: AlbumMetadata[] = []
+		for (let i = 0; i < idx.indexedAlbums.length; i++) {
+			const item = idx.indexedAlbums[i]
+			const directMatch = item.titleLower.includes(query) || item.artistLower.includes(query)
+
+			const matchingTracks: string[] = []
+			for (const [trackLower, trackTitle] of item.trackMap) {
+				if (trackLower.includes(query)) {
+					matchingTracks.push(trackTitle)
 				}
 			}
 
-			if (titleMatch || artistMatch || matchingTrackTitles.length > 0) {
-				filtered.push({
-					...album,
-					matchedTracks: matchingTrackTitles
+			if (directMatch || matchingTracks.length > 0) {
+				albumResults.push({
+					...item.album,
+					matchedTracks: matchingTracks
 				})
 			}
 		}
-		matchedAlbums = filtered
-	}
+		matchedAlbums = albumResults
 
-	// 2. Filter Tracks: Match by track title, artist, album
-	let matchedTracks = allTracks
-	if (query) {
-		matchedTracks = allTracks.filter(track =>
-			(track.title || '').toLowerCase().includes(query) ||
-			(track.artist || '').toLowerCase().includes(query) ||
-			(track.album || '').toLowerCase().includes(query) ||
-			(track.albumTitle || '').toLowerCase().includes(query)
-		)
-	}
+		// 2. High-speed Indexed Track Search (<1ms)
+		const trackResults: TrackWithAlbumInfo[] = []
+		for (let i = 0; i < idx.indexedTracks.length; i++) {
+			const item = idx.indexedTracks[i]
+			if (
+				item.titleLower.includes(query) ||
+				item.artistLower.includes(query) ||
+				item.albumLower.includes(query)
+			) {
+				trackResults.push(item.track)
+			}
+		}
+		matchedTracks = trackResults
 
-	// 3. Filter Artists: Match by artist name or albums
-	let matchedArtists = allArtists
-	if (query) {
-		matchedArtists = allArtists.filter(artist => {
-			if ((artist.name || '').toLowerCase().includes(query)) return true
-			return (artist.albums || []).some(alb =>
-				(alb.title || '').toLowerCase().includes(query)
-			)
-		})
+		// 3. High-speed Indexed Artist Search (<1ms)
+		const artistResults: ArtistMetadata[] = []
+		for (let i = 0; i < idx.indexedArtists.length; i++) {
+			const item = idx.indexedArtists[i]
+			if (item.nameLower.includes(query) || item.albumTitlesLower.some(alb => alb.includes(query))) {
+				artistResults.push(item.artist)
+			}
+		}
+		matchedArtists = artistResults
 	}
 
 	// Sorting

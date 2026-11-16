@@ -2,8 +2,8 @@
 	<section
 		id="download_tab_container"
 		ref="container"
-		class="block h-screen bg-panels-bg text-foreground"
-		:class="{ 'tab-hidden': !isExpanded, 'w-8': !isExpanded }"
+		class="download-bar-container"
+		:class="{ 'tab-hidden': !isExpanded, 'is-collapsed': !isExpanded }"
 		:data-label="$t('downloads')"
 		aria-label="downloads"
 		@transitionend="$refs.container.style.transition = ''"
@@ -11,47 +11,82 @@
 		<!-- Drag handler -->
 		<div
 			v-show="isExpanded"
-			class="absolute w-4 h-full bg-grayscale-200"
-			style="cursor: ew-resize"
+			class="drag-handle"
+			title="Drag to resize"
 			@mousedown.prevent="startDrag"
-		></div>
-
-		<!-- Bar toggler -->
-		<i
-			id="toggle_download_tab"
-			ref="toggler"
-			class="m-1 text-2xl cursor-pointer material-icons"
-			:class="{ 'ml-1': !isExpanded, 'ml-5': isExpanded }"
-			:title="$t('globals.toggle_download_tab_hint')"
-			@click.prevent="toggleDownloadTab"
-		></i>
-
-		<!-- Queue buttons -->
-		<div
-			class="absolute top-0 right-0 transition-all duration-200 ease-in-out"
-			:class="{ 'opacity-0 invisible': !isExpanded, 'opacity-100 visible': isExpanded }"
 		>
-			<i
-				v-if="clientMode"
-				class="m-1 text-2xl cursor-pointer material-icons"
-				:title="$t('globals.open_downloads_folder')"
-				@click="openDownloadsFolder"
-			>
-				folder_open
-			</i>
-			<i class="m-1 text-2xl cursor-pointer material-icons" :title="$t('globals.clean_queue_hint')" @click="cleanQueue">
-				clear_all
-			</i>
-			<i
-				class="m-1 text-2xl cursor-pointer material-icons"
-				:title="$t('globals.cancel_queue_hint')"
-				@click="cancelQueue"
-			>
-				delete_sweep
-			</i>
+			<div class="drag-handle-bar"></div>
 		</div>
 
-		<div v-show="isExpanded" id="download_list" ref="list" class="w-full pr-2" :class="{ slim: isSlim }">
+		<!-- Bar Header (Visible when Expanded) -->
+		<div v-show="isExpanded" class="download-bar-header">
+			<div class="header-left">
+				<button
+					type="button"
+					class="bar-icon-btn toggle-btn"
+					:title="$t('globals.toggle_download_tab_hint')"
+					@click.prevent="toggleDownloadTab"
+				>
+					<i class="material-icons">chevron_right</i>
+				</button>
+				<div class="header-title-box">
+					<span class="bar-title">{{ $t('downloads') }}</span>
+					<span v-if="activeQueueCount > 0" class="bar-active-badge">{{ activeQueueCount }}</span>
+				</div>
+			</div>
+
+			<div class="header-actions">
+				<button
+					v-if="clientMode"
+					type="button"
+					class="bar-icon-btn"
+					:title="$t('globals.open_downloads_folder')"
+					@click="openDownloadsFolder"
+				>
+					<i class="material-icons">folder_open</i>
+				</button>
+				<button
+					type="button"
+					class="bar-icon-btn"
+					:title="$t('globals.clean_queue_hint')"
+					@click="cleanQueue"
+				>
+					<i class="material-icons">clear_all</i>
+				</button>
+				<button
+					type="button"
+					class="bar-icon-btn bar-icon-btn-danger"
+					:title="$t('globals.cancel_queue_hint')"
+					@click="cancelQueue"
+				>
+					<i class="material-icons">delete_sweep</i>
+				</button>
+			</div>
+		</div>
+
+		<!-- Bar Toggler when Collapsed -->
+		<div v-show="!isExpanded" class="collapsed-tab-wrapper" @click.prevent="toggleDownloadTab">
+			<button
+				type="button"
+				class="collapsed-toggle-btn"
+				:title="$t('globals.toggle_download_tab_hint')"
+			>
+				<i class="material-icons">chevron_left</i>
+			</button>
+			<div class="collapsed-label-box">
+				<span class="collapsed-label">{{ $t('downloads') }}</span>
+				<span v-if="activeQueueCount > 0" class="collapsed-count-pill">{{ activeQueueCount }}</span>
+			</div>
+		</div>
+
+		<!-- Download Items List -->
+		<div
+			v-show="isExpanded"
+			id="download_list"
+			ref="list"
+			class="download-list-scroll pr-2"
+			:class="{ slim: isSlim }"
+		>
 			<QueueItem
 				v-for="item in queueList"
 				:key="item.uuid"
@@ -74,15 +109,16 @@ import { toast } from '@/utils/toasts'
 import { fetchData, postToServer } from '@/utils/api'
 
 const tabMinWidth = 250
-const tabMaxWidth = 500
+const tabMaxWidth = 550
 
 export default {
+	name: 'TheDownloadBar',
 	components: {
 		QueueItem
 	},
 	data() {
 		return {
-			cachedTabWidth: parseInt(localStorage.getItem('downloadTabWidth')) || 300,
+			cachedTabWidth: parseInt(localStorage.getItem('downloadTabWidth')) || 320,
 			queue: [],
 			queueList: {},
 			queueComplete: [],
@@ -95,6 +131,9 @@ export default {
 			isSlim: 'getSlimDownloads',
 			showTags: 'getShowBitrateTags'
 		}),
+		activeQueueCount() {
+			return this.queue.length
+		},
 		finishedWithoutErrors() {
 			const isCompletedWithoutErrors = el => (el.status || '') === 'download finished' && el.errors.length === 0
 
@@ -118,7 +157,6 @@ export default {
 		socket.on('startDownload', this.startDownload)
 		socket.on('startConversion', this.startConversion)
 		socket.on('finishConversion', this.finishConversion)
-		// socket.on('init_downloadQueue', this.initQueue)
 		socket.on('addedToQueue', this.addToQueue)
 		socket.on('updateQueue', this.updateQueue)
 		socket.on('removedFromQueue', this.removeFromQueue)
@@ -133,7 +171,7 @@ export default {
 			.catch(console.error)
 
 		// Check if download tab has slim entries
-		if (localStorage.getItem('slimDownloads') === 'true') {
+		if (localStorage.getItem('slimDownloads') === 'true' && this.$refs.list) {
 			this.$refs.list.classList.add('slim')
 		}
 
@@ -155,24 +193,24 @@ export default {
 			socket.emit('removeFromQueue', uuid)
 		},
 		onRetryDownload(uuid) {
-			console.log("Retry", uuid)
-			postToServer('retryDownload', {uuid})
+			console.log('Retry', uuid)
+			postToServer('retryDownload', { uuid })
 		},
 		setTabWidth(newWidth) {
 			if (undefined === newWidth) {
-				this.$refs.container.style.width = ''
-				this.$refs.list.style.width = ''
+				if (this.$refs.container) this.$refs.container.style.width = ''
+				if (this.$refs.list) this.$refs.list.style.width = ''
 			} else {
-				this.$refs.container.style.width = newWidth + 'px'
-				this.$refs.list.style.width = newWidth + 'px'
+				if (this.$refs.container) this.$refs.container.style.width = newWidth + 'px'
+				if (this.$refs.list) this.$refs.list.style.width = newWidth + 'px'
 			}
 		},
 		initQueue(data) {
+			if (!data) return
 			const {
-				queueOrder: initQueue,
-				//		queueComplete: initQueueComplete,
+				queueOrder: initQueue = [],
 				current: currentItem,
-				queue: initQueueList,
+				queue: initQueueList = {},
 				restored
 			} = data
 
@@ -182,8 +220,10 @@ export default {
 
 			if (initQueueComplete && initQueueComplete.length) {
 				initQueueComplete.forEach(item => {
-					initQueueList[item].silent = true
-					this.addToQueue(initQueueList[item])
+					if (initQueueList[item]) {
+						initQueueList[item].silent = true
+						this.addToQueue(initQueueList[item])
+					}
 				})
 			}
 
@@ -217,6 +257,8 @@ export default {
 				}
 			}
 
+			if (!queueItem) return
+
 			// Add implicit values back
 			queueItem.downloaded = queueItem.downloaded || 0
 			queueItem.failed = queueItem.failed || 0
@@ -224,12 +266,10 @@ export default {
 			queueItem.conversion = queueItem.conversion || 0
 			queueItem.errors = queueItem.errors || []
 
-			// * Here we have only queueItem objects
 			this.$set(queueItem, 'current', current)
 			this.$set(this.queueList, queueItem.uuid, queueItem)
 
-			// * Used when opening the app in another tab
-			const itemIsAlreadyDownloaded = queueItem.downloaded + queueItem.failed == queueItem.size
+			const itemIsAlreadyDownloaded = queueItem.downloaded + queueItem.failed === queueItem.size
 
 			if (itemIsAlreadyDownloaded) {
 				const itemIsNotInCompletedQueue = !this.queueComplete.includes(queueItem.uuid)
@@ -237,7 +277,6 @@ export default {
 				this.$set(this.queueList[queueItem.uuid], 'status', 'download finished')
 
 				if (itemIsNotInCompletedQueue) {
-					// * Add it
 					this.queueComplete.push(queueItem.uuid)
 				}
 			} else {
@@ -259,10 +298,9 @@ export default {
 			}
 		},
 		updateQueue(update) {
-			// downloaded and failed default to false?
 			const { uuid, downloaded, failed, progress, conversion, error, data, errid, stack, postFailed } = update
 
-			if (uuid && this.queue.includes(uuid)) {
+			if (uuid && this.queue.includes(uuid) && this.queueList[uuid]) {
 				if (downloaded) {
 					this.queueList[uuid].downloaded++
 				}
@@ -272,11 +310,11 @@ export default {
 					this.queueList[uuid].errors.push({ message: error, data, errid, stack })
 				}
 
-				if (progress) {
+				if (progress !== undefined) {
 					this.queueList[uuid].progress = progress
 				}
 
-				if (conversion) {
+				if (conversion !== undefined) {
 					this.queueList[uuid].conversion = conversion
 				}
 
@@ -309,7 +347,6 @@ export default {
 			}
 		},
 		removedFinishedDownloads() {
-			// TODO: Make this a computed property
 			this.queueComplete = this.finishedWithoutErrors.map(el => el.uuid)
 
 			this.queueComplete.forEach(uuid => {
@@ -321,9 +358,10 @@ export default {
 		toggleDownloadTab() {
 			this.setTabWidth()
 
-			this.$refs.container.style.transition = 'all 250ms ease-in-out'
+			if (this.$refs.container) {
+				this.$refs.container.style.transition = 'all 250ms ease-in-out'
+			}
 
-			// Toggle returns a Boolean based on the action it performed
 			this.isExpanded = !this.isExpanded
 
 			if (this.isExpanded) {
@@ -339,9 +377,9 @@ export default {
 			socket.emit('cancelAllDownloads')
 		},
 		openDownloadsFolder() {
-			// if (this.clientMode) {
-			window.api.send('openDownloadsFolder')
-			// }
+			if (window.api && window.api.send) {
+				window.api.send('openDownloadsFolder')
+			}
 		},
 		handleDrag(event) {
 			let newWidth = window.innerWidth - event.pageX + 2
@@ -359,12 +397,14 @@ export default {
 			document.addEventListener('mousemove', this.handleDrag)
 		},
 		startDownload(uuid) {
-			this.$set(this.queueList[uuid], 'status', 'downloading')
+			if (this.queueList[uuid]) {
+				this.$set(this.queueList[uuid], 'status', 'downloading')
+			}
 		},
 		finishDownload(uuid) {
 			const isInQueue = this.queue.includes(uuid) || this.queueComplete.includes(uuid)
 
-			if (!isInQueue) return
+			if (!isInQueue || !this.queueList[uuid]) return
 
 			this.$set(this.queueList[uuid], 'status', 'download finished')
 			toast(this.$t('toasts.finishDownload', { item: this.queueList[uuid].title }), 'done')
@@ -381,15 +421,18 @@ export default {
 			}
 		},
 		startConversion(uuid) {
-			this.$set(this.queueList[uuid], 'status', 'converting')
-			this.$set(this.queueList[uuid], 'conversion', 0)
+			if (this.queueList[uuid]) {
+				this.$set(this.queueList[uuid], 'status', 'converting')
+				this.$set(this.queueList[uuid], 'conversion', 0)
+			}
 		},
 		finishConversion(downloadObject) {
-			this.$set(this.queueList[downloadObject.uuid], 'size', downloadObject.size)
+			if (downloadObject && this.queueList[downloadObject.uuid]) {
+				this.$set(this.queueList[downloadObject.uuid], 'size', downloadObject.size)
+			}
 		},
 		async showErrorsTab(item) {
 			await this.setErrors(item)
-
 			this.$router.push({ name: 'Errors' })
 		}
 	}
@@ -397,45 +440,203 @@ export default {
 </script>
 
 <style scoped>
-#toggle_download_tab {
-	width: 25px;
-	height: 25px;
-}
-#toggle_download_tab::before {
-	font-family: 'Material Icons';
-	font-style: normal;
-	font-weight: 400;
-	content: 'chevron_right';
+.download-bar-container {
+	position: relative;
+	height: 100vh;
+	background: var(--surface-glass, rgba(15, 23, 42, 0.88));
+	backdrop-filter: blur(16px);
+	-webkit-backdrop-filter: blur(16px);
+	border-left: 1px solid var(--border-color);
+	color: var(--foreground);
+	display: flex;
+	flex-direction: column;
+	z-index: 20;
+	user-select: none;
 }
 
-#download_tab_container.tab-hidden
-#toggle_download_tab::before {
-	content: 'chevron_left';
+.download-bar-container.is-collapsed {
+	width: 2.5rem !important;
+	cursor: pointer;
 }
-#download_tab_container.tab-hidden::after {
-	content: attr(data-label);
+
+.download-bar-container.is-collapsed:hover {
+	background: rgba(255, 255, 255, 0.05);
+}
+
+/* Drag Handle */
+.drag-handle {
+	position: absolute;
+	top: 0;
+	left: -3px;
+	width: 6px;
+	height: 100%;
+	cursor: ew-resize;
+	z-index: 30;
 	display: flex;
 	align-items: center;
-	text-transform: capitalize;
-	writing-mode: vertical-rl;
-	line-height: 2rem;
+	justify-content: center;
 }
 
-#download_list {
-	height: calc(100% - 32px);
-	padding-left: 28px;
-	overflow-y: scroll;
+.drag-handle-bar {
+	width: 2px;
+	height: 3rem;
+	border-radius: 9999px;
+	background: transparent;
+	transition: background-color 0.15s ease;
 }
-#download_list::-webkit-scrollbar {
-	width: 10px;
+
+.drag-handle:hover .drag-handle-bar {
+	background: var(--primary-color);
 }
-#download_list::-webkit-scrollbar-track {
-	background: var(--panels-background);
+
+/* Bar Header */
+.download-bar-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.75rem 1rem;
+	border-bottom: 1px solid var(--border-color);
+	height: 3.5rem;
+	flex-shrink: 0;
 }
-#download_list::-webkit-scrollbar-thumb {
-	background: var(--panels-scroll);
-	border-radius: 4px;
+
+.header-left {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.header-title-box {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+}
+
+.bar-title {
+	font-size: 0.9375rem;
+	font-weight: 700;
+	color: var(--foreground);
+	letter-spacing: -0.01em;
+}
+
+.bar-active-badge {
+	font-size: 0.6875rem;
+	font-weight: 800;
+	color: #fff;
+	background: var(--primary-gradient);
+	padding: 0.1rem 0.45rem;
+	border-radius: 9999px;
+	box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+}
+
+.header-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.25rem;
+}
+
+.bar-icon-btn {
+	width: 2rem;
+	height: 2rem;
+	border-radius: 0.5rem;
+	background: transparent;
+	border: none;
+	color: var(--secondary-text);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.bar-icon-btn:hover {
+	color: var(--foreground);
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.bar-icon-btn i {
+	font-size: 1.2rem;
+}
+
+.bar-icon-btn-danger:hover {
+	color: #ef4444;
+	background: rgba(239, 68, 68, 0.12);
+}
+
+/* Collapsed Tab */
+.collapsed-tab-wrapper {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	padding: 0.75rem 0;
+	gap: 1.5rem;
+}
+
+.collapsed-toggle-btn {
+	background: transparent;
+	border: none;
+	color: var(--secondary-text);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: color 0.15s ease;
+}
+
+.collapsed-toggle-btn:hover {
+	color: var(--primary-color);
+}
+
+.collapsed-label-box {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 0.75rem;
+	writing-mode: vertical-rl;
+	transform: rotate(180deg);
+}
+
+.collapsed-label {
+	font-size: 0.8125rem;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	color: var(--secondary-text);
+	text-transform: uppercase;
+}
+
+.collapsed-count-pill {
+	font-size: 0.6875rem;
+	font-weight: 800;
+	background: var(--primary-gradient);
+	color: #ffffff;
+	padding: 0.25rem 0.45rem;
+	border-radius: 9999px;
+	writing-mode: horizontal-tb;
+	transform: rotate(180deg);
+}
+
+/* Scroll List */
+.download-list-scroll {
+	flex: 1;
+	overflow-y: auto;
+	padding: 0.75rem;
+}
+
+.download-list-scroll::-webkit-scrollbar {
 	width: 6px;
-	padding: 0px 2px;
+}
+
+.download-list-scroll::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.download-list-scroll::-webkit-scrollbar-thumb {
+	background: var(--border-color);
+	border-radius: 9999px;
+}
+
+.download-list-scroll::-webkit-scrollbar-thumb:hover {
+	background: var(--secondary-text);
 }
 </style>

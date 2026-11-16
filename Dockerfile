@@ -63,11 +63,14 @@ LABEL \
     app.deemix.image.title="Docker image for Deemix" \
     app.deemix.image.description="Docker image for Deemix music downloader web app"
 
-RUN apk add --no-cache nodejs curl jq
+RUN apk add --no-cache nodejs curl jq && \
+    mkdir -p /downloads /config && \
+    chmod 777 /downloads /config
 
 COPY --from=builder /app /app
 COPY root/ /
 RUN chmod +x /etc/services.d/deemix/run /etc/cont-init.d/*
 
+VOLUME ["/config", "/downloads"]
 EXPOSE 6595
 ENTRYPOINT [ "/init" ]

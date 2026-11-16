@@ -5,10 +5,14 @@ import dateFormat from 'dateformat'
 import { createLogger, format, transports } from 'winston'
 // @ts-expect-error
 import deemix from 'deemix'
+import { addLog, LogRecord, getLogs, clearLogs, exportLogsText } from './logDb'
+
+export { LogRecord, getLogs, clearLogs, exportLogsText }
+
 const { combine, timestamp, errors, colorize, printf } = format
 
-const logFolder: string = joinPath(deemix.utils.localpaths.getConfigFolder(), 'logs')
-const logFilename = joinPath(logFolder, `${dateFormat(new Date(), 'yyyy-mm-dd-HH.MM.ss')}.log`)
+export const logFolder: string = joinPath(deemix.utils.localpaths.getConfigFolder(), 'logs')
+export const logFilename = joinPath(logFolder, `${dateFormat(new Date(), 'yyyy-mm-dd-HH.MM.ss')}.log`)
 
 const logFormat = printf(error => {
 	const { level, message, timestamp, stack } = error
@@ -17,8 +21,24 @@ const logFormat = printf(error => {
 	return result
 })
 
+// Winston format hook to pipe all log entries directly into logDb
+const dbLogHook = format(info => {
+	try {
+		const rawLevel = (info[Symbol.for('level')] || info.level || 'info')
+			.toString()
+			.replace(/\u001b\[.*?m/g, '')
+			.toLowerCase()
+		const msg = typeof info.message === 'string' ? info.message : JSON.stringify(info.message)
+		const meta = info.stack ? { stack: info.stack } : undefined
+		addLog(rawLevel, msg, meta)
+	} catch {
+		// Ignore any logging errors to prevent cascading failure
+	}
+	return info
+})
+
 export const logger = createLogger({
-	format: combine(errors({ stack: true }), timestamp(), logFormat),
+	format: combine(errors({ stack: true }), timestamp(), dbLogHook(), logFormat),
 	transports: [
 		new transports.File({
 			handleExceptions: true,

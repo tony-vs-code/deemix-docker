@@ -26,6 +26,20 @@ export const deemixVersion = require('../node_modules/deemix/package.json').vers
 const currentVersionTemp = JSON.parse(String(fs.readFileSync(GUI_PACKAGE))).version
 export const currentVersion = currentVersionTemp === '0.0.0' ? 'continuous' : currentVersionTemp
 
+export function testPathWritable(p: string): boolean {
+	try {
+		if (!fs.existsSync(p)) {
+			fs.mkdirSync(p, { recursive: true })
+		}
+		const testFile = `${p}${sep}.write-test-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+		fs.writeFileSync(testFile, 'ok')
+		fs.unlinkSync(testFile)
+		return true
+	} catch {
+		return false
+	}
+}
+
 export const sessionDZ: any = {}
 
 export class DeemixApp {
@@ -58,6 +72,39 @@ export class DeemixApp {
 
 		this.plugins.spotify.setup()
 		this.restoreQueueFromDisk()
+		this.checkPermissions()
+	}
+
+	checkPermissions() {
+		const dlPath = this.settings.downloadLocation || '/downloads'
+		const dlWritable = testPathWritable(dlPath)
+		const cfgWritable = testPathWritable(configFolder)
+		const uid = typeof process.getuid === 'function' ? process.getuid() : -1
+		const gid = typeof process.getgid === 'function' ? process.getgid() : -1
+
+		logger.info(`[Permissions] Process running with UID: ${uid}, GID: ${gid}`)
+		logger.info(
+			`[Permissions] Config directory (${configFolder}): ${
+				cfgWritable ? 'WRITABLE' : 'READ-ONLY (WARNING: cannot save settings/database)'
+			}`
+		)
+
+		if (!dlWritable) {
+			logger.warn(
+				`[Permissions] WARNING: Download directory (${dlPath}) is NOT writable by UID ${uid}! Download tasks will fail. Ensure host directory permissions are chmod 777 or set PUID/PGID matching host user.`
+			)
+		} else {
+			logger.info(`[Permissions] Download directory (${dlPath}): WRITABLE`)
+		}
+
+		return {
+			configWritable: cfgWritable,
+			downloadsWritable: dlWritable,
+			uid,
+			gid,
+			downloadLocation: dlPath,
+			configFolder
+		}
 	}
 
 	async isDeezerAvailable(): Promise<string> {

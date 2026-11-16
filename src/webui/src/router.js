@@ -3,7 +3,6 @@ import VueRouter from 'vue-router'
 
 // Pages
 import InfoArl from '@components/pages/InfoArl.vue'
-import InfoSpotifyFeatures from '@components/pages/InfoSpotifyFeatures.vue'
 import Artist from '@components/pages/Artist.vue'
 import Charts from '@components/pages/Charts.vue'
 import Errors from '@components/pages/Errors.vue'
@@ -53,8 +52,7 @@ const routes = [
 	},
 	{
 		path: '/spotify-playlist/:id',
-		name: 'Spotify Playlist',
-		component: Tracklist
+		redirect: to => ({ name: 'Playlist', params: { id: to.params.id } })
 	},
 	{
 		path: '/charts',
@@ -89,11 +87,6 @@ const routes = [
 		path: '/info-arl',
 		name: 'ARL',
 		component: InfoArl
-	},
-	{
-		path: '/info-spotify',
-		name: 'Spotify Features',
-		component: InfoSpotifyFeatures
 	},
 	{
 		path: '/settings',
@@ -147,16 +140,6 @@ router.beforeEach((to, _, next) => {
 			}
 			fetchData('getTracklist', getTracklistParams).then(playlistData => {
 				EventBus.$emit('showPlaylist', playlistData)
-			})
-			break
-		}
-		case 'Spotify Playlist': {
-			const getTracklistParams = {
-				type: 'spotifyplaylist',
-				id: to.params.id
-			}
-			fetchData('getTracklist', getTracklistParams).then(spotifyPlaylistData => {
-				EventBus.$emit('showSpotifyPlaylist', spotifyPlaylistData)
 			})
 			break
 		}

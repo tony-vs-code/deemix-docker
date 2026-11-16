@@ -22,6 +22,9 @@ import getLibrary from './getLibrary'
 import getLibraryCover from './getLibraryCover'
 import streamLibraryTrack from './streamLibraryTrack'
 import searchLibrary from './searchLibrary'
+import checkPermissions from './checkPermissions'
+import getLogs from './getLogs'
+import exportLogs from './exportLogs'
 
 export default [
 	connect,
@@ -47,5 +50,8 @@ export default [
 	getLibrary,
 	getLibraryCover,
 	streamLibraryTrack,
-	searchLibrary
+	searchLibrary,
+	checkPermissions,
+	getLogs,
+	exportLogs
 ]

@@ -11,6 +11,7 @@ import retryDownload from './retryDownload'
 import scanLibrary from './scanLibrary'
 import deleteLibraryTrack from './deleteLibraryTrack'
 import deleteLibraryAlbum from './deleteLibraryAlbum'
+import clearLogs from './clearLogs'
 
 export default [
 	changeAccount,
@@ -25,5 +26,6 @@ export default [
 	retryDownload,
 	scanLibrary,
 	deleteLibraryTrack,
-	deleteLibraryAlbum
+	deleteLibraryAlbum,
+	clearLogs
 ]
