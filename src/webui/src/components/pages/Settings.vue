@@ -854,6 +854,157 @@
 					</div>
 				</div>
 			</div>
+
+			<!-- TAB 7: APPLICATION LOGS -->
+			<div v-show="currentTab === 'logs'" class="tab-content-panel space-y-6">
+				<!-- Permission Diagnostics Card -->
+				<div v-if="permissions" class="settings-card permission-card">
+					<div v-if="!permissions.downloadsWritable" class="permission-banner banner-warning">
+						<div class="banner-icon-box">
+							<i class="material-icons">warning</i>
+						</div>
+						<div class="banner-text">
+							<h4 class="banner-title">Download Directory Permission Warning</h4>
+							<p class="banner-desc">
+								The download folder (<code>{{ permissions.downloadLocation }}</code>) is <strong>NOT writable</strong> by the container process (UID: {{ permissions.uid }}, GID: {{ permissions.gid }}). Download tasks will fail!
+							</p>
+							<p class="banner-solution">
+								💡 <strong>Solution:</strong> Run <code>chmod -R 777 {{ permissions.downloadLocation }}</code> on your host, or start the container with environment variables <code>PUID</code> and <code>PGID</code> matching your host user (e.g. <code>PUID=1000 PGID=1000</code>).
+							</p>
+						</div>
+					</div>
+					<div v-else class="permission-banner banner-success">
+						<div class="banner-icon-box banner-icon-success">
+							<i class="material-icons">check_circle</i>
+						</div>
+						<div class="banner-text">
+							<h4 class="banner-title">Container Permissions Healthy</h4>
+							<p class="banner-desc">
+								Download directory (<code>{{ permissions.downloadLocation }}</code>) and config directory (<code>{{ permissions.configFolder }}</code>) are both writable by process UID {{ permissions.uid }}.
+							</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Terminal Log Console Card -->
+				<div class="settings-card terminal-card">
+					<div class="card-header">
+						<div class="card-icon-box card-icon-indigo">
+							<i class="material-icons">receipt_long</i>
+						</div>
+						<div class="card-titles">
+							<h3 class="card-title">Application Logs</h3>
+							<p class="card-subtitle">Real-time application event logs, permission diagnostics, and system trace</p>
+						</div>
+						<div class="terminal-header-controls">
+							<button class="btn btn-secondary btn-sm" title="Refresh Logs" :disabled="isLoadingLogs" @click="fetchLogs">
+								<i class="material-icons btn-icon text-sm" :class="{ 'spin-active': isLoadingLogs }">sync</i>
+								<span>Refresh</span>
+							</button>
+							<label class="terminal-toggle-label" title="Automatically poll for new logs every 3 seconds">
+								<input v-model="logAutoRefresh" type="checkbox" class="modern-checkbox" />
+								<span>Auto-refresh</span>
+							</label>
+							<button class="btn btn-secondary btn-sm" title="Copy visible logs to clipboard" @click="copyLogsToClipboard">
+								<i class="material-icons btn-icon text-sm">content_copy</i>
+								<span>Copy</span>
+							</button>
+							<button class="btn btn-secondary btn-sm" title="Download log file" @click="exportLogsDownload">
+								<i class="material-icons btn-icon text-sm">file_download</i>
+								<span>Export</span>
+							</button>
+							<button class="btn btn-danger btn-sm" title="Clear all stored logs" @click="clearApplicationLogs">
+								<i class="material-icons btn-icon text-sm">delete_sweep</i>
+								<span>Clear</span>
+							</button>
+						</div>
+					</div>
+
+					<div class="card-body">
+						<!-- Filters & Search Toolbar -->
+						<div class="terminal-toolbar">
+							<div class="level-filters-group">
+								<button
+									class="level-filter-btn"
+									:class="{ active: logFilterLevel === 'all' }"
+									@click="setLogFilterLevel('all')"
+								>
+									ALL <span class="filter-count">{{ logCounts.all }}</span>
+								</button>
+								<button
+									class="level-filter-btn filter-info"
+									:class="{ active: logFilterLevel === 'info' }"
+									@click="setLogFilterLevel('info')"
+								>
+									INFO <span class="filter-count">{{ logCounts.info }}</span>
+								</button>
+								<button
+									class="level-filter-btn filter-warn"
+									:class="{ active: logFilterLevel === 'warn' }"
+									@click="setLogFilterLevel('warn')"
+								>
+									WARN <span class="filter-count">{{ logCounts.warn }}</span>
+								</button>
+								<button
+									class="level-filter-btn filter-error"
+									:class="{ active: logFilterLevel === 'error' }"
+									@click="setLogFilterLevel('error')"
+								>
+									ERROR <span class="filter-count">{{ logCounts.error }}</span>
+								</button>
+							</div>
+
+							<div class="log-search-box">
+								<i class="material-icons search-icon">search</i>
+								<input
+									v-model="logSearchQuery"
+									type="text"
+									placeholder="Filter log messages..."
+									class="log-search-input"
+									@input="debouncedFetchLogs"
+								/>
+								<button v-if="logSearchQuery" class="clear-search-btn" @click="clearLogSearch">
+									<i class="material-icons text-sm">close</i>
+								</button>
+							</div>
+						</div>
+
+						<!-- Terminal Window -->
+						<div class="terminal-window">
+							<div class="terminal-window-header">
+								<div class="window-dots">
+									<span class="dot dot-red"></span>
+									<span class="dot dot-yellow"></span>
+									<span class="dot dot-green"></span>
+								</div>
+								<div class="window-title">deemix.log — {{ logs.length }} records</div>
+								<div class="window-options">
+									<label class="auto-scroll-label" title="Keep terminal scrolled to latest entries">
+										<input v-model="logAutoScroll" type="checkbox" class="modern-checkbox" />
+										<span>Auto-scroll</span>
+									</label>
+								</div>
+							</div>
+
+							<div ref="terminalBody" class="terminal-body">
+								<div v-if="logs.length === 0" class="terminal-empty-state">
+									<i class="material-icons terminal-empty-icon">terminal</i>
+									<p>No log records match the current filter criteria.</p>
+								</div>
+								<div v-for="log in logs" :key="log.id" class="terminal-line" :class="'line-' + log.level">
+									<span class="log-timestamp">{{ formatLogTime(log.timestamp) }}</span>
+									<span class="log-badge" :class="'badge-' + log.level">{{ log.level.toUpperCase() }}</span>
+									<span class="log-msg">{{ log.message }}</span>
+									<button v-if="log.meta" class="meta-toggle-btn" @click="toggleExpandLog(log.id)">
+										{{ expandedLogIds.includes(log.id) ? '▲ Hide trace' : '▼ Details' }}
+									</button>
+									<pre v-if="log.meta && expandedLogIds.includes(log.id)" class="log-trace-box">{{ JSON.stringify(log.meta, null, 2) }}</pre>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
 
 		<!-- Sticky Bottom Glass Footer Bar -->
@@ -907,8 +1058,19 @@ export default {
 				{ id: 'downloads', label: 'Downloads & Quality', icon: 'cloud_download' },
 				{ id: 'files', label: 'File & Folder Organization', icon: 'create_new_folder' },
 				{ id: 'tags', label: 'Metadata & Tags', icon: 'bookmarks' },
-				{ id: 'artwork', label: 'Artwork & Covers', icon: 'image' }
+				{ id: 'artwork', label: 'Artwork & Covers', icon: 'image' },
+				{ id: 'logs', label: 'Application Logs', icon: 'receipt_long' }
 			],
+			logs: [],
+			logCounts: { all: 0, info: 0, warn: 0, error: 0, debug: 0 },
+			logFilterLevel: 'all',
+			logSearchQuery: '',
+			isLoadingLogs: false,
+			logAutoRefresh: false,
+			logAutoRefreshTimer: null,
+			logAutoScroll: true,
+			permissions: null,
+			expandedLogIds: [],
 			flags,
 			currentLocale: this.$i18n.locale,
 			locales: this.$i18n.availableLocales,
@@ -992,6 +1154,26 @@ export default {
 			else return "Free"
 		}
 	},
+	watch: {
+		currentTab(newTab) {
+			if (newTab === 'logs') {
+				this.fetchLogs()
+				this.fetchPermissions()
+				if (this.logAutoRefresh) {
+					this.startAutoRefresh()
+				}
+			} else {
+				this.stopAutoRefresh()
+			}
+		},
+		logAutoRefresh(enabled) {
+			if (enabled && this.currentTab === 'logs') {
+				this.startAutoRefresh()
+			} else {
+				this.stopAutoRefresh()
+			}
+		}
+	},
 	async mounted() {
 		const { settingsData, defaultSettingsData, spotifyCredentials } = await getSettingsData()
 
@@ -1021,9 +1203,15 @@ export default {
 			window.api.receive('applogin_arl', this.loggedInViaDeezer)
 		}
 
+		if (this.currentTab === 'logs') {
+			this.fetchLogs()
+			this.fetchPermissions()
+		}
+
 		this.$on('hook:destroyed', () => {
 			socket.off('updateSettings')
 			socket.off('familyAccounts')
+			this.stopAutoRefresh()
 		})
 	},
 	methods: {
@@ -1216,6 +1404,126 @@ export default {
 			if (this.user.can_stream_hq && bitrate == 3) return true
 			if (this.user.can_stream_lossless && bitrate == 9) return true
 			return false
+		},
+		async fetchLogs() {
+			this.isLoadingLogs = true
+			try {
+				const params = { limit: 500 }
+				if (this.logFilterLevel && this.logFilterLevel !== 'all') {
+					params.level = this.logFilterLevel
+				}
+				if (this.logSearchQuery && this.logSearchQuery.trim()) {
+					params.search = this.logSearchQuery.trim()
+				}
+				const res = await fetchData('logs', params)
+				if (res && res.logs) {
+					this.logs = res.logs
+					if (res.counts) {
+						this.logCounts = res.counts
+					}
+					if (this.logAutoScroll) {
+						this.$nextTick(() => {
+							const el = this.$refs.terminalBody
+							if (el) {
+								el.scrollTop = el.scrollHeight
+							}
+						})
+					}
+				}
+			} catch (err) {
+				console.error('Failed to fetch logs:', err)
+			} finally {
+				this.isLoadingLogs = false
+			}
+		},
+		debouncedFetchLogs: debounce(function () {
+			this.fetchLogs()
+		}, 300),
+		async fetchPermissions() {
+			try {
+				const res = await fetchData('checkPermissions')
+				if (res && res.status) {
+					this.permissions = res
+				}
+			} catch (err) {
+				console.error('Failed to fetch permissions check:', err)
+			}
+		},
+		setLogFilterLevel(level) {
+			this.logFilterLevel = level
+			this.fetchLogs()
+		},
+		clearLogSearch() {
+			this.logSearchQuery = ''
+			this.fetchLogs()
+		},
+		startAutoRefresh() {
+			this.stopAutoRefresh()
+			this.logAutoRefreshTimer = setInterval(() => {
+				if (this.currentTab === 'logs') {
+					this.fetchLogs()
+				}
+			}, 3000)
+		},
+		stopAutoRefresh() {
+			if (this.logAutoRefreshTimer) {
+				clearInterval(this.logAutoRefreshTimer)
+				this.logAutoRefreshTimer = null
+			}
+		},
+		async clearApplicationLogs() {
+			const confirmed = confirm('Are you sure you want to clear all application log history?')
+			if (!confirmed) return
+			try {
+				await postToServer('logs/clear', {})
+				this.logs = []
+				this.logCounts = { all: 0, info: 0, warn: 0, error: 0, debug: 0 }
+				toast('Application logs cleared', 'delete')
+			} catch (err) {
+				console.error('Failed to clear logs:', err)
+				toast('Failed to clear logs', 'error')
+			}
+		},
+		async copyLogsToClipboard() {
+			try {
+				const res = await fetch(`${window.location.origin}${location.base}api/logs/export`)
+				const text = await res.text()
+				copyToClipboard(text)
+				toast('Logs copied to clipboard!', 'assignment')
+			} catch (err) {
+				console.error('Failed to copy logs:', err)
+				toast('Failed to copy logs', 'error')
+			}
+		},
+		exportLogsDownload() {
+			const exportUrl = `${window.location.origin}${location.base}api/logs/export`
+			const a = document.createElement('a')
+			a.href = exportUrl
+			a.download = `deemix_${new Date().toISOString().slice(0, 10)}.log`
+			document.body.appendChild(a)
+			a.click()
+			document.body.removeChild(a)
+		},
+		toggleExpandLog(id) {
+			const index = this.expandedLogIds.indexOf(id)
+			if (index > -1) {
+				this.expandedLogIds.splice(index, 1)
+			} else {
+				this.expandedLogIds.push(id)
+			}
+		},
+		formatLogTime(timestamp) {
+			if (!timestamp) return ''
+			try {
+				const d = new Date(timestamp)
+				return (
+					d.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) +
+					'.' +
+					String(d.getMilliseconds()).padStart(3, '0')
+				)
+			} catch (e) {
+				return timestamp
+			}
 		}
 	}
 }
@@ -1939,5 +2247,429 @@ export default {
 .save-btn:hover {
 	box-shadow: 0 6px 20px rgba(6, 182, 212, 0.5);
 	transform: translateY(-1px);
+}
+
+/* Danger Button */
+.btn-danger {
+	background: rgba(239, 68, 68, 0.15) !important;
+	border: 1px solid rgba(239, 68, 68, 0.3) !important;
+	color: #ef4444 !important;
+}
+
+.btn-danger:hover {
+	background: rgba(239, 68, 68, 0.25) !important;
+	border-color: rgba(239, 68, 68, 0.5) !important;
+	color: #f87171 !important;
+}
+
+/* Permission Diagnostic Banner */
+.permission-banner {
+	display: flex;
+	gap: 1.25rem;
+	padding: 1.25rem 1.5rem;
+	border-radius: 1rem;
+	background: rgba(15, 23, 42, 0.7);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+}
+
+.permission-banner.banner-ok {
+	border-color: rgba(34, 197, 94, 0.3);
+	background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(15, 23, 42, 0.7));
+}
+
+.permission-banner.banner-warn {
+	border-color: rgba(234, 179, 8, 0.35);
+	background: linear-gradient(135deg, rgba(234, 179, 8, 0.08), rgba(15, 23, 42, 0.7));
+}
+
+.permission-banner.banner-error {
+	border-color: rgba(239, 68, 68, 0.4);
+	background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(15, 23, 42, 0.7));
+}
+
+.banner-icon-col {
+	display: flex;
+	align-items: flex-start;
+	padding-top: 0.25rem;
+}
+
+.banner-icon {
+	font-size: 2rem;
+}
+
+.banner-ok .banner-icon { color: #22c55e; }
+.banner-warn .banner-icon { color: #eab308; }
+.banner-error .banner-icon { color: #ef4444; }
+
+.banner-content {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.banner-title {
+	font-size: 1.05rem;
+	font-weight: 700;
+	color: #f8fafc;
+	margin: 0;
+}
+
+.banner-subtitle {
+	font-size: 0.85rem;
+	color: #94a3b8;
+	margin: 0.15rem 0 0 0;
+}
+
+.banner-checks {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	margin-top: 0.25rem;
+}
+
+.banner-check-item {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	background: rgba(0, 0, 0, 0.25);
+	padding: 0.35rem 0.75rem;
+	border-radius: 0.5rem;
+	border: 1px solid rgba(255, 255, 255, 0.06);
+	font-size: 0.8125rem;
+}
+
+.check-label {
+	color: #cbd5e1;
+	font-weight: 500;
+}
+
+.check-path {
+	color: #64748b;
+	font-family: monospace;
+	font-size: 0.75rem;
+}
+
+.check-badge {
+	font-size: 0.7rem;
+	font-weight: 600;
+	padding: 0.1rem 0.45rem;
+	border-radius: 9999px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.check-badge.badge-ok {
+	background: rgba(34, 197, 94, 0.2);
+	color: #4ade80;
+	border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.check-badge.badge-error {
+	background: rgba(239, 68, 68, 0.2);
+	color: #f87171;
+	border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.banner-process-info {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem 1.25rem;
+	font-size: 0.75rem;
+	color: #94a3b8;
+	padding-top: 0.25rem;
+	border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.banner-process-info strong {
+	color: #e2e8f0;
+}
+
+.banner-hint {
+	font-size: 0.8rem;
+	color: #fca5a5;
+	background: rgba(239, 68, 68, 0.1);
+	border: 1px solid rgba(239, 68, 68, 0.2);
+	padding: 0.5rem 0.75rem;
+	border-radius: 0.5rem;
+	margin: 0;
+}
+
+/* Log Controls Bar */
+.log-controls-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+	margin-bottom: 0.75rem;
+}
+
+.log-level-filters {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+	flex-wrap: wrap;
+}
+
+.log-filter-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	color: #94a3b8;
+	font-size: 0.78rem;
+	font-weight: 500;
+	padding: 0.35rem 0.7rem;
+	border-radius: 0.5rem;
+	cursor: pointer;
+	transition: all 0.15s ease;
+}
+
+.log-filter-btn:hover {
+	background: rgba(255, 255, 255, 0.08);
+	color: #f8fafc;
+}
+
+.log-filter-btn.active {
+	background: rgba(6, 182, 212, 0.2);
+	border-color: rgba(6, 182, 212, 0.5);
+	color: #38bdf8;
+	font-weight: 600;
+}
+
+.log-count-pill {
+	font-size: 0.7rem;
+	padding: 0.05rem 0.35rem;
+	border-radius: 9999px;
+	background: rgba(0, 0, 0, 0.3);
+}
+
+.log-search-box {
+	position: relative;
+	display: flex;
+	align-items: center;
+	min-width: 240px;
+}
+
+.log-search-icon {
+	position: absolute;
+	left: 0.75rem;
+	color: #64748b;
+	pointer-events: none;
+}
+
+.log-search-input {
+	width: 100%;
+	padding: 0.45rem 2rem 0.45rem 2.25rem;
+	background: rgba(15, 23, 42, 0.6);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 0.5rem;
+	color: #f8fafc;
+	font-size: 0.8125rem;
+	outline: none;
+	transition: border-color 0.15s ease;
+}
+
+.log-search-input:focus {
+	border-color: #06b6d4;
+}
+
+.clear-search-btn {
+	position: absolute;
+	right: 0.5rem;
+	background: transparent;
+	border: none;
+	color: #94a3b8;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	padding: 0.2rem;
+}
+
+.clear-search-btn:hover {
+	color: #f8fafc;
+}
+
+/* Terminal Window & Lines */
+.terminal-window {
+	border-radius: 0.875rem;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	background: #090d16;
+	overflow: hidden;
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.terminal-window-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	background: rgba(15, 23, 42, 0.85);
+	padding: 0.6rem 1rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.window-dots {
+	display: flex;
+	gap: 0.35rem;
+}
+
+.dot {
+	width: 0.65rem;
+	height: 0.65rem;
+	border-radius: 50%;
+}
+
+.dot-red { background: #ef4444; }
+.dot-yellow { background: #eab308; }
+.dot-green { background: #22c55e; }
+
+.window-title {
+	font-size: 0.75rem;
+	font-family: monospace;
+	color: #94a3b8;
+}
+
+.window-options {
+	display: flex;
+	align-items: center;
+}
+
+.auto-scroll-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.75rem;
+	color: #94a3b8;
+	cursor: pointer;
+}
+
+.terminal-body {
+	max-height: 520px;
+	overflow-y: auto;
+	padding: 0.75rem 1rem;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	font-size: 0.8rem;
+	line-height: 1.5;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+
+.terminal-empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 3rem 1rem;
+	color: #64748b;
+	gap: 0.5rem;
+}
+
+.terminal-empty-icon {
+	font-size: 2.5rem;
+}
+
+.terminal-line {
+	display: flex;
+	align-items: baseline;
+	gap: 0.6rem;
+	flex-wrap: wrap;
+	padding: 0.2rem 0.35rem;
+	border-radius: 0.25rem;
+	transition: background 0.1s ease;
+}
+
+.terminal-line:hover {
+	background: rgba(255, 255, 255, 0.03);
+}
+
+.log-timestamp {
+	color: #64748b;
+	font-size: 0.75rem;
+	flex-shrink: 0;
+}
+
+.log-badge {
+	font-size: 0.65rem;
+	font-weight: 700;
+	padding: 0.1rem 0.4rem;
+	border-radius: 0.25rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	flex-shrink: 0;
+}
+
+.badge-info {
+	background: rgba(56, 189, 248, 0.15);
+	color: #38bdf8;
+	border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.badge-warn {
+	background: rgba(234, 179, 8, 0.15);
+	color: #facc15;
+	border: 1px solid rgba(234, 179, 8, 0.25);
+}
+
+.badge-error {
+	background: rgba(239, 68, 68, 0.15);
+	color: #f87171;
+	border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.badge-debug {
+	background: rgba(148, 163, 184, 0.15);
+	color: #cbd5e1;
+	border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.log-msg {
+	color: #e2e8f0;
+	flex: 1;
+	word-break: break-word;
+}
+
+.line-warn .log-msg {
+	color: #fef08a;
+}
+
+.line-error .log-msg {
+	color: #fca5a5;
+}
+
+.line-debug .log-msg {
+	color: #94a3b8;
+}
+
+.meta-toggle-btn {
+	background: transparent;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	color: #94a3b8;
+	font-size: 0.7rem;
+	padding: 0.1rem 0.4rem;
+	border-radius: 0.25rem;
+	cursor: pointer;
+	margin-left: auto;
+}
+
+.meta-toggle-btn:hover {
+	color: #f8fafc;
+	border-color: rgba(255, 255, 255, 0.25);
+}
+
+.log-trace-box {
+	width: 100%;
+	background: rgba(0, 0, 0, 0.5);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 0.35rem;
+	padding: 0.5rem;
+	font-size: 0.75rem;
+	color: #cbd5e1;
+	overflow-x: auto;
+	margin: 0.25rem 0;
 }
 </style>

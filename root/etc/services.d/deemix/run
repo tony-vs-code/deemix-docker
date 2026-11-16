@@ -1,6 +1,6 @@
 #!/usr/bin/with-contenv bash
 
-UMASK_SET=${UMASK_SET:-022}
+UMASK_SET=${UMASK_SET:-002}
 umask "$UMASK_SET"
 
 cd /
@@ -22,5 +22,9 @@ export DEEMIX_MUSIC_DIR=/downloads/
 export DEEMIX_SERVER_PORT=$port
 export DEEMIX_HOST=0.0.0.0
 
-echo "[services.d] Starting Deemix"
-exec s6-setuidgid abc node /app/server/dist/app.js
+echo "[services.d] Starting Deemix (UID: $(id -u), GID: $(id -g))"
+if [ "$(id -u)" = "0" ]; then
+	exec s6-setuidgid abc node /app/server/dist/app.js
+else
+	exec node /app/server/dist/app.js
+fi
