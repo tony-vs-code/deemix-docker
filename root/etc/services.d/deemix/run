@@ -23,4 +23,4 @@ export DEEMIX_SERVER_PORT=$port
 export DEEMIX_HOST=0.0.0.0
 
 echo "[services.d] Starting Deemix"
-s6-setuidgid abc /deemix-server
+exec s6-setuidgid abc node /app/server/dist/app.js
