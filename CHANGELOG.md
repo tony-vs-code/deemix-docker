@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.26] - 2026-11-16
+
+### Added
+- ARL Health & Session Diagnostics: added `GET /api/arlHealth` endpoint and `arlUpdatedAt` tracking in `loginStorage.ts` to report ARL validity, source, account tier (`HiFi`, `Premium`, `Free`), and estimated remaining session days.
+- Session & ARL Health UI: added a real-time ARL Health status panel with account tier badges, session life bar, Verify Session action, and Show/Hide ARL toggle in `Settings.vue`.
+- Quick ARL Cookie Helper Modal: added an interactive multi-browser guide modal with one-click copyable cookie/snippet helpers and direct Paste & Connect login.
+
+### Changed
+- Modernized `InfoArl.vue` to match the dark slate glassmorphic UI.
+
+### Fixed
+- Responsive Settings Tab Bar: updated `.settings-tabs-bar` to wrap cleanly on desktop/tablet and switch to a responsive grid on small windows (`<= 768px` / `<= 420px`) without clipping tabs.
+- Application Log Filter Styling: fixed mismatched CSS selectors so `All`, `INFO`, `WARN`, and `ERROR` filter buttons and counts render with proper color-coded styles.
+
 ## [2026.11.25] - 2026-11-16
 
 ### Added
