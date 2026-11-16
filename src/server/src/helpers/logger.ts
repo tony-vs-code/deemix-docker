@@ -24,7 +24,7 @@ const logFormat = printf(error => {
 // Winston format hook to pipe all log entries directly into logDb
 const dbLogHook = format(info => {
 	try {
-		const rawLevel = (info[Symbol.for('level')] || info.level || 'info')
+		const rawLevel = ((info as any)[Symbol.for('level')] || info.level || 'info')
 			.toString()
 			.replace(/\u001b\[.*?m/g, '')
 			.toLowerCase()
