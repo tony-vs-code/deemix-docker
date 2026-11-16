@@ -44,8 +44,10 @@ export const sessionDZ: any = {}
 
 export class DeemixApp {
 	queueOrder: string[]
-	queue: any
-	currentJob: any
+	queue: Record<string, any>
+	activeJobs: Map<string, any>
+	queuePaused: boolean
+	lastDZ: any
 
 	deezerAvailable: string | null
 	latestVersion: string | null
@@ -60,7 +62,9 @@ export class DeemixApp {
 
 		this.queueOrder = []
 		this.queue = {}
-		this.currentJob = null
+		this.activeJobs = new Map()
+		this.queuePaused = false
+		this.lastDZ = null
 
 		this.plugins = {
 			// eslint-disable-next-line new-cap
@@ -74,6 +78,15 @@ export class DeemixApp {
 		this.restoreQueueFromDisk()
 		this.checkPermissions()
 	}
+
+	get currentJob(): any {
+		for (const job of this.activeJobs.values()) {
+			return job?.downloader || job || null
+		}
+		return null
+	}
+
+	set currentJob(_: any) {}
 
 	checkPermissions() {
 		const dlPath = this.settings.downloadLocation || '/downloads'
@@ -189,19 +202,34 @@ export class DeemixApp {
 	}
 
 	saveSettings(newSettings: any, newSpotifySettings: any) {
+		const oldConcurrency = Math.max(1, Number(this.settings?.queueConcurrency) || 1)
 		newSettings.executeCommand = this.settings.executeCommand
 		deemix.settings.save(newSettings, configFolder)
 		this.settings = newSettings
 		this.plugins.spotify.saveSettings(newSpotifySettings)
+
+		const newConcurrency = Math.max(1, Number(this.settings?.queueConcurrency) || 1)
+		if (newConcurrency > oldConcurrency && !this.queuePaused && this.lastDZ) {
+			this.startQueue(this.lastDZ)
+		}
 	}
 
 	getQueue() {
+		const currentItems: any[] = []
+		for (const job of this.activeJobs.values()) {
+			const dlObj = job?.downloadObject || job?.downloader?.downloadObject
+			if (dlObj && typeof dlObj.getSlimmedDict === 'function') {
+				currentItems.push(dlObj.getSlimmedDict())
+			}
+		}
 		const result: any = {
 			queue: this.queue,
-			queueOrder: this.queueOrder
+			queueOrder: this.queueOrder,
+			queuePaused: this.queuePaused,
+			currentItems
 		}
-		if (this.currentJob && this.currentJob !== true) {
-			result.current = this.currentJob.downloadObject.getSlimmedDict()
+		if (currentItems.length > 0) {
+			result.current = currentItems[0]
 		}
 		return result
 	}
@@ -214,6 +242,7 @@ export class DeemixApp {
 		)
 			throw new CantStream(bitrate)
 
+		this.lastDZ = dz
 		let downloadObjs: any[] = []
 		const downloadErrors: any[] = []
 		let link: string = ''
@@ -278,26 +307,70 @@ export class DeemixApp {
 		return slimmedObjects
 	}
 
-	async startQueue(dz: any): Promise<any> {
-		do {
-			if (this.currentJob !== null || this.queueOrder.length === 0) {
-				// Should not start another download
-				return null
-			}
-			this.currentJob = true // lock currentJob
+	async startQueue(dz?: any): Promise<any> {
+		if (dz) {
+			this.lastDZ = dz
+		}
+		const activeDz = dz || this.lastDZ
+		if (!activeDz || this.queuePaused) {
+			return null
+		}
 
-			let currentUUID: string
-			do {
-				currentUUID = this.queueOrder.shift() || ''
-			} while (this.queue[currentUUID] === undefined && this.queueOrder.length)
-			if (this.queue[currentUUID] === undefined) {
-				fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
-				this.currentJob = null
-				return null
+		const maxConcurrency = Math.max(1, Number(this.settings?.queueConcurrency) || 1)
+
+		while (!this.queuePaused && this.activeJobs.size < maxConcurrency && this.queueOrder.length > 0) {
+			let currentUUID: string | null = null
+
+			while (this.queueOrder.length > 0) {
+				const candidate = this.queueOrder.shift()
+				if (candidate && this.queue[candidate] !== undefined && !this.activeJobs.has(candidate)) {
+					currentUUID = candidate
+					break
+				}
 			}
-			this.queue[currentUUID].status = 'downloading'
-			const currentItem: any = JSON.parse(fs.readFileSync(configFolder + `queue${sep}${currentUUID}.json`).toString())
-			let downloadObject: any
+
+			if (!currentUUID) {
+				try {
+					fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
+				} catch (err) {
+					logger.error(`Error saving queue order: ${err}`)
+				}
+				break
+			}
+
+			try {
+				fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
+			} catch (err) {
+				logger.error(`Error saving queue order: ${err}`)
+			}
+
+			if (this.queue[currentUUID]) {
+				this.queue[currentUUID].status = 'downloading'
+			}
+
+			// Reserve worker slot
+			this.activeJobs.set(currentUUID, { downloadObject: null, downloader: null })
+
+			// Process worker asynchronously without blocking the loop
+			this.processQueueWorker(activeDz, currentUUID)
+		}
+
+		return null
+	}
+
+	private async processQueueWorker(dz: any, currentUUID: string): Promise<void> {
+		let downloadObject: any = null
+		try {
+			const itemFilePath = configFolder + `queue${sep}${currentUUID}.json`
+			if (!fs.existsSync(itemFilePath)) {
+				this.activeJobs.delete(currentUUID)
+				if (this.queue[currentUUID]) {
+					delete this.queue[currentUUID]
+				}
+				return
+			}
+
+			const currentItem: any = JSON.parse(fs.readFileSync(itemFilePath).toString())
 			switch (currentItem.__type__) {
 				case 'Single':
 					downloadObject = new Single(currentItem)
@@ -307,23 +380,33 @@ export class DeemixApp {
 					break
 				case 'Convertable':
 					downloadObject = new Convertable(currentItem)
+					this.activeJobs.set(currentUUID, { downloadObject, downloader: null })
+					this.listener.send('startConversion', currentUUID)
 					downloadObject = await this.plugins[downloadObject.plugin].convert(
 						dz,
 						downloadObject,
 						this.settings,
 						this.listener
 					)
+					this.listener.send('finishConversion', downloadObject.getEssentialDict())
 					fs.writeFileSync(
 						configFolder + `queue${sep}${downloadObject.uuid}.json`,
 						JSON.stringify({ ...downloadObject.toDict(), status: 'inQueue' })
 					)
 					break
 			}
-			this.currentJob = new Downloader(dz, downloadObject, this.settings, this.listener)
-			this.listener.send('startDownload', currentUUID)
-			await this.currentJob.start()
 
-			if (!downloadObject.isCanceled) {
+			if (!downloadObject || downloadObject.isCanceled) {
+				return
+			}
+
+			const downloader = new Downloader(dz, downloadObject, this.settings, this.listener)
+			this.activeJobs.set(currentUUID, { downloader, downloadObject })
+			this.listener.send('startDownload', currentUUID)
+
+			await downloader.start()
+
+			if (!downloadObject.isCanceled && this.queue[currentUUID]) {
 				// Set status
 				if (downloadObject.failed === downloadObject.size && downloadObject.size !== 0) {
 					this.queue[currentUUID].status = 'failed'
@@ -344,67 +427,231 @@ export class DeemixApp {
 				if (this.queue[currentUUID].status === 'completed' || this.queue[currentUUID].status === 'withErrors') {
 					const downloadLocation = this.settings?.downloadLocation || '/downloads'
 					scanLibrary(downloadLocation)
-						.then((updatedLib) => {
+						.then(updatedLib => {
 							this.listener.send('libraryUpdated', updatedLib)
 						})
-						.catch((scanErr) => {
+						.catch(scanErr => {
 							logger.error(`Failed to auto-index completed download: ${scanErr}`)
 						})
 				}
 			}
-			logger.info(this.queueOrder)
-			fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
 
-			this.currentJob = null
-		} while (this.queueOrder.length)
+			try {
+				fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
+			} catch (err) {
+				logger.error(`Error saving queue order: ${err}`)
+			}
+		} catch (err) {
+			logger.error(`Error in download worker for ${currentUUID}: ${err}`)
+			if (this.queue[currentUUID]) {
+				this.queue[currentUUID].status = 'failed'
+			}
+		} finally {
+			this.activeJobs.delete(currentUUID)
+			if (!this.queuePaused) {
+				this.startQueue(dz)
+			}
+		}
 	}
 
 	cancelDownload(uuid: string) {
-		if (Object.keys(this.queue).includes(uuid)) {
-			switch (this.queue[uuid].status) {
-				case 'downloading':
-					this.currentJob.downloadObject.isCanceled = true
+		if (uuid && Object.prototype.hasOwnProperty.call(this.queue, uuid)) {
+			const itemStatus = this.queue[uuid]?.status
+			switch (itemStatus) {
+				case 'downloading': {
+					const activeJob = this.activeJobs.get(uuid)
+					if (activeJob) {
+						if (activeJob.downloadObject) {
+							activeJob.downloadObject.isCanceled = true
+						}
+						if (activeJob.downloader?.downloadObject) {
+							activeJob.downloader.downloadObject.isCanceled = true
+						}
+					}
 					this.listener.send('cancellingCurrentItem', uuid)
 					break
-				case 'inQueue':
-					this.queueOrder.splice(this.queueOrder.indexOf(uuid), 1)
-					fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
-				// break
-				// eslint-disable-next-line no-fallthrough
+				}
+				case 'inQueue': {
+					const orderIdx = this.queueOrder.indexOf(uuid)
+					if (orderIdx > -1) {
+						this.queueOrder.splice(orderIdx, 1)
+						try {
+							fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
+						} catch (err) {
+							logger.error(`Error saving queue order: ${err}`)
+						}
+					}
+					this.listener.send('removedFromQueue', uuid)
+					break
+				}
 				default:
-					// This gets called even in the 'inQueue' case. Is this the expected behaviour? If no, de-comment the break
 					this.listener.send('removedFromQueue', uuid)
 					break
 			}
-			fs.unlinkSync(configFolder + `queue${sep}${uuid}.json`)
+			try {
+				const itemPath = configFolder + `queue${sep}${uuid}.json`
+				if (fs.existsSync(itemPath)) {
+					fs.unlinkSync(itemPath)
+				}
+			} catch (err) {
+				logger.error(`Error removing queue item file ${uuid}: ${err}`)
+			}
 			delete this.queue[uuid]
 		}
 	}
 
 	cancelAllDownloads() {
 		this.queueOrder = []
-		let currentItem: string | null = null
-		Object.values(this.queue).forEach((downloadObject: any) => {
-			if (downloadObject.status === 'downloading') {
-				this.currentJob.downloadObject.isCanceled = true
-				this.listener.send('cancellingCurrentItem', downloadObject.uuid)
-				currentItem = downloadObject.uuid
+		let firstCancelled: string | null = null
+
+		// Cancel all active jobs
+		for (const [uuid, activeJob] of this.activeJobs.entries()) {
+			if (activeJob.downloadObject) {
+				activeJob.downloadObject.isCanceled = true
 			}
-			fs.unlinkSync(configFolder + `queue${sep}${downloadObject.uuid}.json`)
-			delete this.queue[downloadObject.uuid]
+			if (activeJob.downloader?.downloadObject) {
+				activeJob.downloader.downloadObject.isCanceled = true
+			}
+			this.listener.send('cancellingCurrentItem', uuid)
+			if (!firstCancelled) {
+				firstCancelled = uuid
+			}
+		}
+
+		Object.values(this.queue).forEach((downloadObject: any) => {
+			if (downloadObject && downloadObject.uuid) {
+				try {
+					const itemPath = configFolder + `queue${sep}${downloadObject.uuid}.json`
+					if (fs.existsSync(itemPath)) {
+						fs.unlinkSync(itemPath)
+					}
+				} catch (err) {
+					logger.error(`Error removing queue item file ${downloadObject.uuid}: ${err}`)
+				}
+				delete this.queue[downloadObject.uuid]
+			}
 		})
-		fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
-		this.listener.send('removedAllDownloads', currentItem)
+
+		try {
+			fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
+		} catch (err) {
+			logger.error(`Error saving queue order: ${err}`)
+		}
+
+		this.listener.send('removedAllDownloads', firstCancelled)
 	}
 
 	clearCompletedDownloads() {
 		Object.values(this.queue).forEach((downloadObject: any) => {
-			if (downloadObject.status === 'completed') {
-				fs.unlinkSync(configFolder + `queue${sep}${downloadObject.uuid}.json`)
+			if (downloadObject && downloadObject.status === 'completed') {
+				try {
+					const itemPath = configFolder + `queue${sep}${downloadObject.uuid}.json`
+					if (fs.existsSync(itemPath)) {
+						fs.unlinkSync(itemPath)
+					}
+				} catch (err) {
+					logger.error(`Error deleting completed download file ${downloadObject.uuid}: ${err}`)
+				}
 				delete this.queue[downloadObject.uuid]
 			}
 		})
+		this.queueOrder = this.queueOrder.filter(uuid => this.queue[uuid] !== undefined)
+		try {
+			fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
+		} catch (err) {
+			logger.error(`Error saving queue order: ${err}`)
+		}
 		this.listener.send('removedFinishedDownloads')
+	}
+
+	clearFailedDownloads() {
+		Object.values(this.queue).forEach((downloadObject: any) => {
+			if (downloadObject && (downloadObject.status === 'failed' || downloadObject.status === 'withErrors')) {
+				const uuid = downloadObject.uuid
+				try {
+					const itemPath = configFolder + `queue${sep}${uuid}.json`
+					if (fs.existsSync(itemPath)) {
+						fs.unlinkSync(itemPath)
+					}
+				} catch (err) {
+					logger.error(`Error deleting failed download file ${uuid}: ${err}`)
+				}
+				delete this.queue[uuid]
+			}
+		})
+		this.queueOrder = this.queueOrder.filter(uuid => this.queue[uuid] !== undefined)
+		try {
+			fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
+		} catch (err) {
+			logger.error(`Error saving queue order: ${err}`)
+		}
+		this.listener.send('removedFailedDownloads')
+	}
+
+	pauseQueue() {
+		this.queuePaused = true
+		this.listener.send('queuePaused', true)
+	}
+
+	resumeQueue(dz?: any) {
+		if (dz) {
+			this.lastDZ = dz
+		}
+		this.queuePaused = false
+		this.listener.send('queuePaused', false)
+		this.listener.send('queueResumed')
+		const activeDz = dz || this.lastDZ
+		if (activeDz) {
+			this.startQueue(activeDz)
+		}
+	}
+
+	reorderQueue(newOrder: string[]) {
+		if (!Array.isArray(newOrder)) return
+		const currentOrderSet = new Set(this.queueOrder)
+		const sanitized: string[] = []
+
+		for (const uuid of newOrder) {
+			if (typeof uuid === 'string' && currentOrderSet.has(uuid) && !sanitized.includes(uuid)) {
+				sanitized.push(uuid)
+			}
+		}
+
+		for (const uuid of this.queueOrder) {
+			if (!sanitized.includes(uuid)) {
+				sanitized.push(uuid)
+			}
+		}
+
+		this.queueOrder = sanitized
+		try {
+			fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
+		} catch (err) {
+			logger.error(`Error saving queue order: ${err}`)
+		}
+		this.listener.send('queueOrderUpdated', this.queueOrder)
+	}
+
+	moveQueueItem(uuid: string, direction: 'up' | 'down') {
+		const index = this.queueOrder.indexOf(uuid)
+		if (index === -1) return
+
+		if (direction === 'up' && index > 0) {
+			const temp = this.queueOrder[index - 1]
+			this.queueOrder[index - 1] = this.queueOrder[index]
+			this.queueOrder[index] = temp
+		} else if (direction === 'down' && index < this.queueOrder.length - 1) {
+			const temp = this.queueOrder[index + 1]
+			this.queueOrder[index + 1] = this.queueOrder[index]
+			this.queueOrder[index] = temp
+		}
+
+		try {
+			fs.writeFileSync(configFolder + `queue${sep}order.json`, JSON.stringify(this.queueOrder))
+		} catch (err) {
+			logger.error(`Error saving queue order: ${err}`)
+		}
+		this.listener.send('queueOrderUpdated', this.queueOrder)
 	}
 
 	restoreQueueFromDisk() {
@@ -449,9 +696,11 @@ export class DeemixApp {
 							downloadObject = new Convertable(currentItem)
 							break
 					}
-					this.queue[downloadObject.uuid] = downloadObject.getEssentialDict()
-					this.queue[downloadObject.uuid].status = 'inQueue'
-				} else {
+					if (downloadObject && downloadObject.uuid) {
+						this.queue[downloadObject.uuid] = downloadObject.getEssentialDict()
+						this.queue[downloadObject.uuid].status = 'inQueue'
+					}
+				} else if (currentItem && currentItem.uuid) {
 					this.queue[currentItem.uuid] = currentItem
 				}
 			}

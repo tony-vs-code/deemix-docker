@@ -12,6 +12,10 @@ import scanLibrary from './scanLibrary'
 import deleteLibraryTrack from './deleteLibraryTrack'
 import deleteLibraryAlbum from './deleteLibraryAlbum'
 import clearLogs from './clearLogs'
+import pauseQueue from './pauseQueue'
+import resumeQueue from './resumeQueue'
+import clearFailedDownloads from './clearFailedDownloads'
+import reorderQueue from './reorderQueue'
 
 export default [
 	changeAccount,
@@ -27,5 +31,9 @@ export default [
 	scanLibrary,
 	deleteLibraryTrack,
 	deleteLibraryAlbum,
-	clearLogs
+	clearLogs,
+	pauseQueue,
+	resumeQueue,
+	clearFailedDownloads,
+	reorderQueue
 ]

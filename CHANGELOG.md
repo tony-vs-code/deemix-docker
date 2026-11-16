@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.24] - 2026-11-16
+
+### Added
+- Queue Concurrency Control: multi-slot download worker pool governed by `settings.queueConcurrency` with concurrent active download tracking in the WebUI.
+- Batch Queue Operations: `Pause All` / `Resume All` queue controls, `Clear Failed` action, and corresponding `/pauseQueue`, `/resumeQueue`, and `/clearFailedDownloads` HTTP/WebSocket endpoints.
+- Download Priority & Reordering: `/reorderQueue` endpoint with Move Up / Move Down buttons and drag-and-drop reordering for queued items in `Downloads.vue`.
+
 ## [2026.11.23] - 2026-11-16
 
 ### Added
