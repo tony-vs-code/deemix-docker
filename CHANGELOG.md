@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.23] - 2026-11-16
+
+### Added
+- Structured DB Application Logs — integrated high-performance structured database logging (`logDb.ts`) with automatic Winston transport hooks, log rotation, and real-time frontend querying.
+- Application Logs Console — introduced dedicated Settings Tab 7 with an interactive dark slate log terminal featuring instant text search, log level filtering (error, warn, info, debug), copy-to-clipboard, raw JSON export, and toggleable auto-refresh.
+- Filesystem Diagnostics API — added `GET /api/checkPermissions` endpoint reporting mount path write accessibility, UID/GID, umask, and volume health diagnostics.
+
+### Fixed
+- Non-Root Container Permissions Hardening — resolved permission denied (`EACCES`) errors when downloading to `/downloads` under non-root users (e.g. `media` UID 1000). Pre-created `/downloads` and `/config` directories with permissive mode (`chmod 777`) and explicit `VOLUME` declarations in Dockerfile.
+- Native Non-Root Container Execution — updated container entrypoint to detect non-root execution and run `exec node /app/server/dist/app.js` directly, preventing `s6-applyuidgid` initialization failures.
+- File Creation Permissions — set default container `UMASK_SET=002` ensuring generated music files remain readable and writable across host users, and added graceful `10-fix_folders` fallback.
+
+### Removed
+- Legacy Spotify Assets & Routes — removed obsolete `InfoSpotifyFeatures.vue`, static Spotify tutorial assets (`res/InfoSpotifyFeatures/`), removed `/info-spotify` route, and cleanly redirected `/spotify-playlist/:id` to search.
+
+### Changed
+- Modernized Download Bars — redesigned `QueueItem.vue` and `TheDownloadBar.vue` with glassmorphic slate cards, smooth progress bars, and status pills.
+- In-Memory Inverted Token Index — enhanced `libraryDb.ts` with pre-computed inverted lowercase token index for sub-millisecond full-text library searches.
+
 ## [2026.11.22] - 2026-11-15
 
 ### Changed
