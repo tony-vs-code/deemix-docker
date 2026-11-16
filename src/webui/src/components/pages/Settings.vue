@@ -2297,28 +2297,24 @@ export default {
 /* Category Tab Navigation Bar */
 .settings-tabs-bar {
 	display: flex;
-	gap: 0.5rem;
-	overflow-x: auto;
-	padding: 0.375rem;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	padding: 0.45rem;
 	background: rgba(15, 23, 42, 0.65);
 	backdrop-filter: blur(12px);
 	-webkit-backdrop-filter: blur(12px);
 	border: 1px solid rgba(255, 255, 255, 0.08);
 	border-radius: 0.875rem;
 	margin-bottom: 1.75rem;
-	scrollbar-width: none;
-}
-
-.settings-tabs-bar::-webkit-scrollbar {
-	display: none;
 }
 
 .tab-btn {
 	display: inline-flex;
 	align-items: center;
+	justify-content: center;
 	gap: 0.5rem;
-	padding: 0.625rem 1.125rem;
-	font-size: 0.875rem;
+	padding: 0.575rem 1rem;
+	font-size: 0.85rem;
 	font-weight: 500;
 	color: #94a3b8;
 	border-radius: 0.625rem;
@@ -2326,8 +2322,33 @@ export default {
 	border: 1px solid transparent;
 	cursor: pointer;
 	white-space: nowrap;
+	flex: 1 1 auto;
 	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 	outline: none;
+}
+
+@media (max-width: 768px) {
+	.settings-tabs-bar {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.4rem;
+		padding: 0.4rem;
+	}
+
+	.tab-btn {
+		justify-content: flex-start;
+		padding: 0.55rem 0.75rem;
+		font-size: 0.8rem;
+		white-space: normal;
+		text-align: left;
+		line-height: 1.2;
+	}
+}
+
+@media (max-width: 420px) {
+	.settings-tabs-bar {
+		grid-template-columns: minmax(0, 1fr);
+	}
 }
 
 .tab-btn:hover {
@@ -3102,11 +3123,12 @@ export default {
 }
 
 /* Log Controls Bar */
+.log-toolbar,
 .log-controls-bar {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 1rem;
+	gap: 0.75rem;
 	flex-wrap: wrap;
 	margin-bottom: 0.75rem;
 }
@@ -3114,10 +3136,11 @@ export default {
 .log-level-filters {
 	display: flex;
 	align-items: center;
-	gap: 0.35rem;
+	gap: 0.4rem;
 	flex-wrap: wrap;
 }
 
+.level-filter-btn,
 .log-filter-btn {
 	display: inline-flex;
 	align-items: center;
@@ -3126,42 +3149,77 @@ export default {
 	border: 1px solid rgba(255, 255, 255, 0.08);
 	color: #94a3b8;
 	font-size: 0.78rem;
-	font-weight: 500;
-	padding: 0.35rem 0.7rem;
+	font-weight: 600;
+	padding: 0.38rem 0.75rem;
 	border-radius: 0.5rem;
 	cursor: pointer;
 	transition: all 0.15s ease;
 }
 
+.level-filter-btn:hover,
 .log-filter-btn:hover {
-	background: rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.09);
 	color: #f8fafc;
 }
 
+.level-filter-btn.active,
 .log-filter-btn.active {
-	background: rgba(6, 182, 212, 0.2);
+	background: rgba(6, 182, 212, 0.18);
 	border-color: rgba(6, 182, 212, 0.5);
 	color: #38bdf8;
-	font-weight: 600;
 }
 
+.level-filter-btn.filter-info.active {
+	background: rgba(56, 189, 248, 0.18);
+	border-color: rgba(56, 189, 248, 0.5);
+	color: #38bdf8;
+}
+
+.level-filter-btn.filter-warn {
+	color: #eab308;
+	border-color: rgba(234, 179, 8, 0.2);
+}
+
+.level-filter-btn.filter-warn.active {
+	background: rgba(234, 179, 8, 0.18);
+	border-color: rgba(234, 179, 8, 0.55);
+	color: #fde047;
+}
+
+.level-filter-btn.filter-error {
+	color: #f87171;
+	border-color: rgba(239, 68, 68, 0.22);
+}
+
+.level-filter-btn.filter-error.active {
+	background: rgba(239, 68, 68, 0.2);
+	border-color: rgba(239, 68, 68, 0.55);
+	color: #fca5a5;
+}
+
+.filter-count,
 .log-count-pill {
 	font-size: 0.7rem;
-	padding: 0.05rem 0.35rem;
+	padding: 0.08rem 0.4rem;
 	border-radius: 9999px;
-	background: rgba(0, 0, 0, 0.3);
+	background: rgba(0, 0, 0, 0.35);
+	color: inherit;
 }
 
 .log-search-box {
 	position: relative;
 	display: flex;
 	align-items: center;
-	min-width: 240px;
+	min-width: 220px;
+	flex: 1 1 220px;
+	max-width: 340px;
 }
 
+.log-search-box .search-icon,
 .log-search-icon {
 	position: absolute;
-	left: 0.75rem;
+	left: 0.7rem;
+	font-size: 1rem;
 	color: #64748b;
 	pointer-events: none;
 }
