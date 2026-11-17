@@ -321,3 +321,74 @@ export interface PlexScanResult {
 	message?: string
 	error?: string
 }
+
+export interface PlexTrack {
+	id: string
+	ratingKey: string
+	title: string
+	artist: string
+	album: string
+	albumTitle: string
+	albumArtist: string
+	albumRatingKey: string
+	trackNumber: number
+	discNumber: number
+	duration: number
+	size: number
+	formattedSize: string
+	format: string
+	bitrate?: number
+	path: string
+	partKey: string
+	thumb: string
+	plexThumb: string
+	source: 'plex'
+}
+
+export interface PlexAlbum {
+	id: string
+	ratingKey: string
+	title: string
+	artist: string
+	cover: string
+	plexThumb: string
+	year?: number
+	tracks: PlexTrack[]
+	totalSize: number
+	formattedTotalSize: string
+	trackCount: number
+	tracksCount: number
+	source: 'plex'
+}
+
+export interface PlexArtist {
+	name: string
+	ratingKey: string
+	albums: PlexAlbum[]
+	albumCount: number
+	albumsCount: number
+	trackCount: number
+	totalTracks: number
+	totalSize: number
+	source: 'plex'
+}
+
+export interface PlexLibraryResult {
+	source: 'plex'
+	enabled: boolean
+	configured: boolean
+	serverUrl?: string
+	artists: PlexArtist[]
+	totalArtists: number
+	totalAlbums: number
+	totalTracks: number
+	totalSize: number
+	formattedTotalSize: string
+	lastScanned: string | null
+	error?: string
+}
+
+export interface PlexDeleteResult {
+	success: boolean
+	error?: string
+}

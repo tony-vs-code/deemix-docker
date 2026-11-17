@@ -8,7 +8,12 @@
 					{{ $t('libraryPage.title') }}
 				</h1>
 				<div class="header-badges-row">
-					<div class="folder-badge">
+					<div v-if="activeSource === 'plex'" class="folder-badge plex-source-badge">
+						<i class="material-icons folder-icon plex-badge-icon">cast_connected</i>
+						<span class="folder-label">{{ $t('libraryPage.plexSourceLabel') }}:</span>
+						<span class="folder-path plex-server-pill">{{ plexServerUrl || 'Plex Media Server' }}</span>
+					</div>
+					<div v-else class="folder-badge">
 						<i class="material-icons folder-icon">folder</i>
 						<span class="folder-label">{{ $t('libraryPage.downloadPath') }}:</span>
 						<span class="folder-path">{{ downloadLocation || '/downloads' }}</span>
@@ -21,9 +26,29 @@
 				</div>
 			</div>
 
-			<!-- Rescan Button -->
+			<!-- Source Switcher & Rescan Button -->
 			<div class="header-actions">
-				<button class="btn btn-primary action-btn" :disabled="isScanning" @click="rescanLibrary(false)">
+				<div v-if="isPlexAvailable" class="source-switcher" role="group" :aria-label="$t('libraryPage.sourceLabel')">
+					<button
+						type="button"
+						class="source-pill-btn"
+						:class="{ 'source-pill-plex-active': activeSource === 'plex' }"
+						@click="setLibrarySource('plex')"
+					>
+						<i class="material-icons source-pill-icon">cast_connected</i>
+						<span>{{ $t('libraryPage.sourcePlex') }}</span>
+					</button>
+					<button
+						type="button"
+						class="source-pill-btn"
+						:class="{ 'source-pill-local-active': activeSource === 'local' }"
+						@click="setLibrarySource('local')"
+					>
+						<i class="material-icons source-pill-icon">folder</i>
+						<span>{{ $t('libraryPage.sourceLocal') }}</span>
+					</button>
+				</div>
+				<button class="btn btn-primary action-btn" :disabled="isScanning || isLoadingLibrary" @click="rescanLibrary(false)">
 					<i class="material-icons btn-icon" :class="{ 'spin-active': isScanning }">sync</i>
 					<span>{{
 						isScanning
@@ -32,6 +57,27 @@
 							? $t('libraryPage.rescanLibrary')
 							: $t('libraryPage.scanLibrary')
 					}}</span>
+				</button>
+			</div>
+		</div>
+
+		<!-- Plex Connection Error Banner -->
+		<div v-if="activeSource === 'plex' && plexError" class="plex-error-banner">
+			<div class="plex-error-info">
+				<i class="material-icons plex-error-icon">cloud_off</i>
+				<div>
+					<div class="plex-error-title">{{ $t('libraryPage.plexErrorTitle') }}</div>
+					<div class="plex-error-message">{{ plexError }}</div>
+				</div>
+			</div>
+			<div class="plex-error-actions">
+				<button type="button" class="btn btn-secondary btn-sm" @click="loadLibrary(true)">
+					<i class="material-icons text-sm mr-1">refresh</i>
+					<span>{{ $t('libraryPage.retryPlex') }}</span>
+				</button>
+				<button type="button" class="btn btn-secondary btn-sm" @click="setLibrarySource('local')">
+					<i class="material-icons text-sm mr-1">folder</i>
+					<span>{{ $t('libraryPage.switchToLocal') }}</span>
 				</button>
 			</div>
 		</div>
@@ -148,12 +194,24 @@
 		</div>
 
 		<!-- Loading State -->
-		<div v-if="isScanning && allAlbums.length === 0" class="scanning-state">
+		<div v-if="(isScanning || isLoadingLibrary) && allAlbums.length === 0" class="scanning-state">
 			<div class="spin-icon-box">
 				<i class="material-icons spin-large spin-active">sync</i>
 			</div>
-			<p class="scanning-title">{{ $t('libraryPage.scanningLibrary') }}</p>
-			<p class="scanning-subtitle">{{ $t('libraryPage.scanningDescription') }}</p>
+			<p class="scanning-title">
+				{{
+					activeSource === 'plex' && !isScanning
+						? $t('libraryPage.loadingPlexLibrary')
+						: $t('libraryPage.scanningLibrary')
+				}}
+			</p>
+			<p class="scanning-subtitle">
+				{{
+					activeSource === 'plex' && !isScanning
+						? $t('libraryPage.loadingPlexDescription')
+						: $t('libraryPage.scanningDescription')
+				}}
+			</p>
 		</div>
 
 		<!-- 1. ALBUMS VIEW -->
@@ -164,7 +222,7 @@
 					v-for="(album, index) in paginatedAlbums"
 					:key="
 						'album-grid-' +
-						(album.path && album.path !== '.' ? album.path : album.artist + '-' + album.title) +
+						(album.ratingKey || (album.path && album.path !== '.' ? album.path : album.artist + '-' + album.title)) +
 						'-' +
 						index
 					"
@@ -262,7 +320,7 @@
 								v-for="(album, index) in paginatedAlbums"
 								:key="
 									'album-list-' +
-									(album.path && album.path !== '.' ? album.path : album.artist + '-' + album.title) +
+									(album.ratingKey || (album.path && album.path !== '.' ? album.path : album.artist + '-' + album.title)) +
 									'-' +
 									index
 								"
@@ -371,7 +429,13 @@
 					{{ searchQuery ? $t('libraryPage.empty.noSearchTitle') : $t('libraryPage.empty.emptyTitle') }}
 				</h3>
 				<p class="empty-description">
-					{{ searchQuery ? $t('libraryPage.empty.noSearchMessage') : $t('libraryPage.empty.emptyMessage') }}
+					{{
+						searchQuery
+							? $t('libraryPage.empty.noSearchMessage')
+							: activeSource === 'plex'
+							? $t('libraryPage.empty.plexEmptyMessage')
+							: $t('libraryPage.empty.emptyMessage')
+					}}
 				</p>
 				<button v-if="!searchQuery" class="btn btn-primary mt-6" @click="rescanLibrary(true)">
 					<i class="material-icons mr-1.5 text-base">sync</i>
@@ -439,7 +503,7 @@
 						<tbody>
 							<tr
 								v-for="(track, index) in paginatedTracks"
-								:key="'track-' + (track.path || track.title) + '-' + index"
+								:key="'track-' + (track.ratingKey || track.path || track.title) + '-' + index"
 								class="track-row track-playable-row"
 								:class="{ 'row-is-playing': isCurrentTrack(track) }"
 								@click="playTrack(track, filteredTracks)"
@@ -588,15 +652,27 @@
 								{{ selectedAlbum.artist }}
 							</p>
 							<div class="modal-pills-row">
+								<span v-if="selectedAlbum.source === 'plex'" class="meta-pill plex-meta-pill">
+									<i class="material-icons pill-icon">cast_connected</i>
+									Plex
+								</span>
 								<span class="meta-pill">
 									<i class="material-icons pill-icon">audiotrack</i>
 									{{ selectedAlbum.tracksCount }} {{ $t('libraryPage.tracks') }}
+								</span>
+								<span v-if="selectedAlbum.year" class="meta-pill">
+									<i class="material-icons pill-icon">calendar_today</i>
+									{{ selectedAlbum.year }}
 								</span>
 								<span v-if="selectedAlbum.formattedTotalSize" class="meta-pill">
 									<i class="material-icons pill-icon">storage</i>
 									{{ selectedAlbum.formattedTotalSize }}
 								</span>
-								<span v-if="selectedAlbum.path" class="meta-pill path-pill" :title="selectedAlbum.path">
+								<span
+									v-if="selectedAlbum.source !== 'plex' && selectedAlbum.path"
+									class="meta-pill path-pill"
+									:title="selectedAlbum.path"
+								>
 									<i class="material-icons pill-icon">folder_open</i>
 									{{ selectedAlbum.path }}
 								</span>
@@ -640,7 +716,7 @@
 							<tbody>
 								<tr
 									v-for="(track, index) in selectedAlbum.tracks"
-									:key="'modal-track-' + (track.path || track.title) + '-' + index"
+									:key="'modal-track-' + (track.ratingKey || track.path || track.title) + '-' + index"
 									class="track-row track-playable-row"
 									:class="{ 'row-is-playing': isCurrentTrack(track) }"
 									@click="playTrack(track, selectedAlbum.tracks)"
@@ -714,14 +790,22 @@
 				</div>
 				<h3 class="confirm-modal-title">
 					{{
-						pendingDelete.type === 'album'
+						pendingDelete.item && (pendingDelete.item.source === 'plex' || activeSource === 'plex')
+							? pendingDelete.type === 'album'
+								? $t('libraryPage.confirmDeletePlexAlbumTitle')
+								: $t('libraryPage.confirmDeletePlexTrackTitle')
+							: pendingDelete.type === 'album'
 							? $t('libraryPage.confirmDeleteAlbumTitle')
 							: $t('libraryPage.confirmDeleteTrackTitle')
 					}}
 				</h3>
 				<p class="confirm-modal-message">
 					{{
-						pendingDelete.type === 'album'
+						pendingDelete.item && (pendingDelete.item.source === 'plex' || activeSource === 'plex')
+							? pendingDelete.type === 'album'
+								? $t('libraryPage.confirmDeletePlexAlbumMessage', { title: pendingDelete.item.title })
+								: $t('libraryPage.confirmDeletePlexTrackMessage', { title: pendingDelete.item.title })
+							: pendingDelete.type === 'album'
 							? $t('libraryPage.confirmDeleteAlbumMessage', { title: pendingDelete.item.title })
 							: $t('libraryPage.confirmDeleteTrackMessage', { title: pendingDelete.item.title })
 					}}
@@ -872,6 +956,7 @@
 <script>
 import { fetchData, postToServer } from '@/utils/api'
 import { socket } from '@/utils/socket'
+import { toast } from '@/utils/toasts'
 import { getSidebarLink, navigateToChildQuery, resolveLinkChildId, syncRouteQuery } from '@/data/sidebar'
 
 const libraryLink = getSidebarLink('library')
@@ -880,6 +965,14 @@ function fastCompare(a, b) {
 	const s1 = (a || '').toLowerCase()
 	const s2 = (b || '').toLowerCase()
 	return s1 < s2 ? -1 : s1 > s2 ? 1 : 0
+}
+
+function formatByteSize(bytes) {
+	if (!bytes || bytes <= 0) return '0 B'
+	const k = 1024
+	const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+	const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1)
+	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
 }
 
 function loadStoredPlayerSettings() {
@@ -949,6 +1042,12 @@ export default {
 		const storedSettings = loadStoredPlayerSettings()
 		return {
 			activeTab: resolveLinkChildId(libraryLink, this.$route ? this.$route.query : {}),
+			librarySource: 'auto',
+			plexEnabled: false,
+			plexConfigured: false,
+			plexServerUrl: '',
+			plexError: '',
+			isLoadingLibrary: false,
 			displayMode: 'grid',
 			sortBy: 'title_asc',
 			isScanning: false,
@@ -984,6 +1083,14 @@ export default {
 		}
 	},
 	computed: {
+		isPlexAvailable() {
+			return this.plexEnabled && this.plexConfigured
+		},
+		activeSource() {
+			if (this.librarySource === 'local') return 'local'
+			if (this.librarySource === 'plex') return this.isPlexAvailable ? 'plex' : 'local'
+			return this.isPlexAvailable ? 'plex' : 'local'
+		},
 		volumeIcon() {
 			if (this.isMuted || this.audioVolume === 0) return 'volume_off'
 			if (this.audioVolume < 0.5) return 'volume_down'
@@ -1009,13 +1116,24 @@ export default {
 			return this.filteredTracks.slice(start, start + this.trackPageSize)
 		},
 		audioStreamUrl() {
-			if (!this.currentTrack || !this.currentTrack.path) return ''
+			if (!this.currentTrack) return ''
 			const base = location.base.endsWith('/') ? location.base : `${location.base}/`
+			if (this.currentTrack.source === 'plex' || this.currentTrack.partKey) {
+				const partKey = this.currentTrack.partKey || this.currentTrack.path
+				if (!partKey) return ''
+				return `${base}api/plex/stream?partKey=${encodeURIComponent(partKey)}`
+			}
+			if (!this.currentTrack.path) return ''
 			return `${base}api/streamLibraryTrack?path=${encodeURIComponent(this.currentTrack.path)}`
 		},
 		currentTrackCover() {
 			if (!this.currentTrack) return ''
-			return this.currentTrack.albumCover || (this.selectedAlbum && this.selectedAlbum.cover) || ''
+			return (
+				this.currentTrack.albumCover ||
+				this.currentTrack.thumb ||
+				(this.selectedAlbum && this.selectedAlbum.cover) ||
+				''
+			)
 		},
 		hasPreviousTrack() {
 			if (!this.currentTrack) return false
@@ -1074,7 +1192,7 @@ export default {
 					albums.sort((a, b) => fastCompare(a.artist, b.artist) || fastCompare(a.title, b.title))
 					break
 				case 'tracks_desc':
-					albums.sort((a, b) => (b.tracksCount || 0) - (a.tracksCount || 0))
+					albums.sort((a, b) => (b.tracksCount ?? b.trackCount ?? 0) - (a.tracksCount ?? a.trackCount ?? 0))
 					break
 				case 'size_desc':
 					albums.sort((a, b) => (b.totalSize || 0) - (a.totalSize || 0))
@@ -1150,11 +1268,7 @@ export default {
 			this.allAlbums.forEach(album => {
 				if (album.totalSize) totalBytes += album.totalSize
 			})
-			if (totalBytes === 0) return '0 B'
-			const k = 1024
-			const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-			const i = Math.floor(Math.log(totalBytes) / Math.log(k))
-			return `${parseFloat((totalBytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
+			return formatByteSize(totalBytes)
 		}
 	},
 	watch: {
@@ -1221,6 +1335,9 @@ export default {
 		socket.on('libraryUpdated', this.handleLibraryUpdated)
 		document.addEventListener('keydown', this.handleKeyDown)
 	},
+	activated() {
+		this.syncPlexAvailability()
+	},
 	destroyed() {
 		socket.off('libraryUpdated', this.handleLibraryUpdated)
 		document.removeEventListener('keydown', this.handleKeyDown)
@@ -1262,11 +1379,18 @@ export default {
 			}
 			this.persistPlayerSettings()
 		},
+		isSameTrack(a, b) {
+			if (!a || !b) return false
+			if (a.source && b.source && a.source !== b.source) return false
+			const idA = a.ratingKey || a.path
+			const idB = b.ratingKey || b.path
+			return Boolean(idA && idB && idA === idB)
+		},
 		isCurrentTrack(track) {
-			return !!(this.currentTrack && track && this.currentTrack.path === track.path)
+			return this.isSameTrack(this.currentTrack, track)
 		},
 		playTrack(track, queue = [], options = {}) {
-			if (this.currentTrack && this.currentTrack.path === track.path) {
+			if (this.isSameTrack(this.currentTrack, track)) {
 				if (options.restart) {
 					const audio = this.$refs.audioPlayer
 					if (audio) {
@@ -1284,7 +1408,7 @@ export default {
 			this.currentTrack = track
 			if (queue && queue.length > 0) {
 				this.playbackQueue = queue
-				this.queueIndex = queue.findIndex(t => t.path === track.path)
+				this.queueIndex = queue.findIndex(t => this.isSameTrack(t, track))
 			} else {
 				this.playbackQueue = [track]
 				this.queueIndex = 0
@@ -1367,7 +1491,7 @@ export default {
 
 			if (this.isShuffled && this.playHistory.length > 0) {
 				const prevTrack = this.playHistory.pop()
-				const idx = this.playbackQueue.findIndex(t => t.path === prevTrack.path)
+				const idx = this.playbackQueue.findIndex(t => this.isSameTrack(t, prevTrack))
 				this.queueIndex = idx !== -1 ? idx : 0
 				this.playTrack(prevTrack, this.playbackQueue, { isNavigation: true })
 				return
@@ -1410,7 +1534,11 @@ export default {
 		onAudioLoadedMetadata() {
 			const audio = this.$refs.audioPlayer
 			if (audio) {
-				this.audioDuration = audio.duration || 0
+				const rawDur = audio.duration
+				this.audioDuration =
+					typeof rawDur === 'number' && Number.isFinite(rawDur) && rawDur > 0
+						? rawDur
+						: (this.currentTrack && this.currentTrack.duration) || 0
 				this.updateMediaSessionPositionState()
 			}
 		},
@@ -1657,25 +1785,36 @@ export default {
 			if (!data) return
 			this.downloadLocation = data.downloadLocation || ''
 			this.lastScanned = data.lastScanned || null
-			this.artists = data.artists || []
+			const normalizedArtists = (data.artists || []).map(artist => ({
+				...artist,
+				albumsCount: artist.albumsCount ?? artist.albumCount ?? (Array.isArray(artist.albums) ? artist.albums.length : 0),
+				totalTracks: artist.totalTracks ?? artist.trackCount ?? 0
+			}))
+			this.artists = normalizedArtists
 			this.totalTracks = data.totalTracks || 0
 			this.totalAlbums = data.totalAlbums || 0
-			this.totalArtists = data.totalArtists || 0
+			this.totalArtists = data.totalArtists ?? normalizedArtists.length
 
 			const albums = []
 			const tracks = []
-			;(data.artists || []).forEach(artist => {
+			normalizedArtists.forEach(artist => {
 				if (Array.isArray(artist.albums)) {
 					artist.albums.forEach(album => {
 						const tracksTitleStr = Array.isArray(album.tracks) ? album.tracks.map(t => t.title || '').join(' ') : ''
 						album._searchIndex = `${album.title || ''} ${album.artist || ''} ${tracksTitleStr}`.toLowerCase()
+						album.tracksCount = album.tracksCount ?? album.trackCount ?? (Array.isArray(album.tracks) ? album.tracks.length : 0)
+						album.formattedTotalSize = album.formattedTotalSize || formatByteSize(album.totalSize || 0)
 						albums.push(album)
 						if (Array.isArray(album.tracks)) {
 							album.tracks.forEach(track => {
+								if (!track.formattedSize) {
+									track.formattedSize = formatByteSize(track.size || 0)
+								}
 								tracks.push({
 									...track,
-									albumTitle: album.title,
-									albumCover: album.cover
+									albumTitle: track.albumTitle || album.title,
+									albumCover: album.cover || track.thumb || track.plexThumb || '',
+									albumRatingKey: track.albumRatingKey || album.ratingKey || ''
 								})
 							})
 						}
@@ -1689,7 +1828,8 @@ export default {
 			if (this.selectedAlbum) {
 				const found = this.allAlbums.find(
 					a =>
-						a.path === this.selectedAlbum.path ||
+						(this.selectedAlbum.ratingKey && a.ratingKey === this.selectedAlbum.ratingKey) ||
+						(this.selectedAlbum.path && a.path === this.selectedAlbum.path) ||
 						(a.title === this.selectedAlbum.title && a.artist === this.selectedAlbum.artist)
 				)
 				if (found && found.tracks && found.tracks.length > 0) {
@@ -1699,17 +1839,102 @@ export default {
 				}
 			}
 		},
-		async loadLibrary() {
+		setLibrarySource(source) {
+			if (source !== 'plex' && source !== 'local') return
+			if (source === this.activeSource && this.librarySource === source) return
+			this.librarySource = source
+			this.selectedAlbum = null
+			this.pendingDelete = null
+			this.albumCurrentPage = 1
+			this.trackCurrentPage = 1
+			this.plexError = ''
+			this.loadLibrary()
+		},
+		async syncPlexAvailability() {
 			try {
+				const cfg = await fetchData('plex/settings')
+				if (!cfg) return
+				const wasAvailable = this.isPlexAvailable
+				const prevUrl = this.plexServerUrl
+				const nextEnabled = Boolean(cfg.enabled)
+				const nextConfigured = Boolean(cfg.serverUrl && cfg.token)
+				const nextAvailable = nextEnabled && nextConfigured
+				this.plexEnabled = nextEnabled
+				this.plexConfigured = nextConfigured
+				this.plexServerUrl = cfg.serverUrl || ''
+				if (nextAvailable && (!wasAvailable || prevUrl !== this.plexServerUrl) && this.librarySource !== 'local') {
+					await this.loadLibrary()
+				} else if (!nextAvailable && wasAvailable) {
+					this.plexError = ''
+					if (this.librarySource === 'plex') {
+						this.librarySource = 'auto'
+					}
+					await this.loadLibrary()
+				}
+			} catch (error) {
+				// Ignore transient Plex settings check failures
+			}
+		},
+		async loadLibrary(forceRefresh = false) {
+			this.isLoadingLibrary = true
+			this.plexError = ''
+			try {
+				if (this.librarySource !== 'local') {
+					try {
+						const params = forceRefresh ? { refresh: 'true' } : {}
+						const plexData = await fetchData('plex/library', params)
+						if (plexData && plexData.enabled && plexData.configured) {
+							this.plexEnabled = true
+							this.plexConfigured = true
+							this.plexServerUrl = plexData.serverUrl || ''
+							this.librarySource = 'plex'
+							this.plexError = plexData.error || ''
+							this.applyLibraryData(plexData)
+							return
+						}
+						this.plexEnabled = Boolean(plexData && plexData.enabled)
+						this.plexConfigured = Boolean(plexData && plexData.configured)
+						this.plexServerUrl = (plexData && plexData.serverUrl) || ''
+						if (this.librarySource === 'plex') {
+							this.librarySource = 'auto'
+						}
+					} catch (plexErr) {
+						console.warn('Failed to query Plex library, falling back to local library:', plexErr)
+						if (this.librarySource === 'plex') {
+							this.plexError = (plexErr && plexErr.message) || 'Failed to load Plex library'
+							return
+						}
+					}
+				}
+
 				const data = await fetchData('getLibrary')
 				this.applyLibraryData(data)
 			} catch (error) {
 				console.error('Failed to load library:', error)
+			} finally {
+				this.isLoadingLibrary = false
 			}
 		},
 		async rescanLibrary(force = false) {
 			this.isScanning = true
+			this.plexError = ''
 			try {
+				if (this.activeSource === 'plex') {
+					const scanRes = await postToServer('plex/scan', {})
+					if (scanRes && scanRes.success === false && scanRes.error) {
+						this.plexError = scanRes.error
+						toast(scanRes.error, 'error')
+					} else if (scanRes && scanRes.success) {
+						toast(this.$t('libraryPage.plexScanTriggered'), 'refresh')
+					}
+					const plexData = await fetchData('plex/library', { refresh: 'true' })
+					if (plexData && plexData.error) {
+						this.plexError = plexData.error
+					}
+					this.applyLibraryData(plexData)
+					return
+				}
+
 				const result = await postToServer('scanLibrary', { force })
 				if (result && result.library) {
 					this.applyLibraryData(result.library)
@@ -1723,6 +1948,9 @@ export default {
 			}
 		},
 		handleLibraryUpdated(updatedLib) {
+			if (this.activeSource === 'plex') {
+				return
+			}
 			if (updatedLib) {
 				this.applyLibraryData(updatedLib)
 			} else {
@@ -1756,7 +1984,11 @@ export default {
 		},
 		openTrackAlbum(track) {
 			const found = this.allAlbums.find(
-				a => (track.albumTitle && a.title === track.albumTitle) || (track.path && a.path === track.path.split('/')[0])
+				a =>
+					(track.albumRatingKey && a.ratingKey === track.albumRatingKey) ||
+					(track.albumTitle && a.title === track.albumTitle && (!track.albumArtist || a.artist === track.albumArtist)) ||
+					(track.albumTitle && a.title === track.albumTitle) ||
+					(track.path && a.path && a.path === track.path.split('/')[0])
 			)
 			if (found) {
 				this.openAlbumModal(found)
@@ -1772,16 +2004,48 @@ export default {
 			if (!this.pendingDelete) return
 			this.isDeleting = true
 			try {
+				const item = this.pendingDelete.item
+				const isPlexItem = item && (item.source === 'plex' || (this.activeSource === 'plex' && item.ratingKey))
+				if (isPlexItem) {
+					const base = location.base.endsWith('/') ? location.base : `${location.base}/`
+					const response = await fetch(`${window.location.origin}${base}api/plex/delete`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ ratingKey: item.ratingKey })
+					})
+					const res = await response.json().catch(() => null)
+					if (!response.ok || !res || res.success === false) {
+						const errMsg = (res && res.error) || this.$t('libraryPage.plexDeleteFailed')
+						toast(errMsg, 'error')
+						return
+					}
+					if (res.library) {
+						this.applyLibraryData(res.library)
+					} else {
+						await this.loadLibrary(true)
+					}
+					if (
+						this.pendingDelete.type === 'album' &&
+						this.selectedAlbum &&
+						((this.selectedAlbum.ratingKey && this.selectedAlbum.ratingKey === item.ratingKey) ||
+							(this.selectedAlbum.path && this.selectedAlbum.path === item.path))
+					) {
+						this.closeAlbumModal()
+					}
+					toast(this.$t('libraryPage.plexDeleteSuccess'), 'delete')
+					return
+				}
+
 				if (this.pendingDelete.type === 'album') {
-					const res = await postToServer('deleteLibraryAlbum', { albumPath: this.pendingDelete.item.path })
+					const res = await postToServer('deleteLibraryAlbum', { albumPath: item.path })
 					if (res && res.library) {
 						this.applyLibraryData(res.library)
 					}
-					if (this.selectedAlbum && this.selectedAlbum.path === this.pendingDelete.item.path) {
+					if (this.selectedAlbum && this.selectedAlbum.path === item.path) {
 						this.closeAlbumModal()
 					}
 				} else if (this.pendingDelete.type === 'track') {
-					const res = await postToServer('deleteLibraryTrack', { trackPath: this.pendingDelete.item.path })
+					const res = await postToServer('deleteLibraryTrack', { trackPath: item.path })
 					if (res && res.library) {
 						this.applyLibraryData(res.library)
 					}
@@ -1812,6 +2076,9 @@ export default {
 				return coverPath
 			}
 			const base = location.base.endsWith('/') ? location.base : `${location.base}/`
+			if (coverPath.startsWith('/library/')) {
+				return `${base}api/plex/thumb?path=${encodeURIComponent(coverPath)}`
+			}
 			const normalizedCover = coverPath.startsWith('/') ? coverPath.slice(1) : coverPath
 			return `${base}${normalizedCover}`
 		},
@@ -1930,6 +2197,120 @@ export default {
 .header-actions {
 	display: flex;
 	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+}
+
+.source-switcher {
+	display: inline-flex;
+	align-items: center;
+	background: var(--card-background);
+	border: 1px solid var(--border-color);
+	border-radius: 0.75rem;
+	padding: 0.2rem;
+	gap: 0.2rem;
+	height: 2.5rem;
+}
+
+.source-pill-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0 0.75rem;
+	height: 100%;
+	border: none;
+	border-radius: 0.55rem;
+	background: transparent;
+	color: var(--secondary-text);
+	font-size: 0.8125rem;
+	font-weight: 700;
+	cursor: pointer;
+	transition: all 0.18s ease;
+}
+
+.source-pill-btn:hover {
+	color: var(--foreground);
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.source-pill-icon {
+	font-size: 1rem;
+}
+
+.source-pill-plex-active {
+	background: linear-gradient(135deg, #e5a00d 0%, #d97706 100%);
+	color: #0f172a !important;
+	box-shadow: 0 2px 10px rgba(229, 160, 13, 0.35);
+}
+
+.source-pill-local-active {
+	background: var(--primary-color);
+	color: #fff !important;
+	box-shadow: 0 2px 10px rgba(var(--primary-color-rgb, 124, 58, 237), 0.35);
+}
+
+.plex-badge-icon {
+	color: #f59e0b;
+}
+
+.plex-server-pill {
+	color: #fbbf24;
+	border-color: rgba(245, 158, 11, 0.35);
+}
+
+.plex-meta-pill {
+	color: #fbbf24;
+	border-color: rgba(245, 158, 11, 0.35);
+	background: rgba(245, 158, 11, 0.12);
+}
+
+.plex-meta-pill .pill-icon {
+	color: #f59e0b;
+}
+
+.plex-error-banner {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 1rem;
+	padding: 0.9rem 1.15rem;
+	margin-bottom: 1.25rem;
+	border-radius: 1rem;
+	background: rgba(239, 68, 68, 0.1);
+	border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.plex-error-info {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	min-width: 0;
+}
+
+.plex-error-icon {
+	font-size: 1.5rem;
+	color: #f87171;
+	flex-shrink: 0;
+}
+
+.plex-error-title {
+	font-size: 0.875rem;
+	font-weight: 700;
+	color: var(--foreground);
+}
+
+.plex-error-message {
+	font-size: 0.8125rem;
+	color: #fca5a5;
+	word-break: break-word;
+}
+
+.plex-error-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
 }
 
 .action-btn {

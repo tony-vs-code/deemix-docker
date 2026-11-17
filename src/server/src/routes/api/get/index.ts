@@ -29,6 +29,9 @@ import exportLogs from './exportLogs'
 import plexSettings from './plexSettings'
 import plexAuthPinStatus from './plexAuthPinStatus'
 import plexServers from './plexServers'
+import plexLibrary from './plexLibrary'
+import plexThumb from './plexThumb'
+import plexStream from './plexStream'
 
 export default [
 	connect,
@@ -61,5 +64,8 @@ export default [
 	exportLogs,
 	plexSettings,
 	plexAuthPinStatus,
-	plexServers
+	plexServers,
+	plexLibrary,
+	plexThumb,
+	plexStream
 ]
