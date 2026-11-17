@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.29] - 2026-11-16
+
+### Fixed
+- WebUI Bundle Runtime Crash (`exports is not defined`): removed `transformMixedEsModules: true` from `@rollup/plugin-commonjs` in `src/webui/rollup.config.js`, which caused `lodash` to emit bare `exports && ...` checks in browser bundles and prevented `startApp()` from mounting.
+
+### Added
+- Bundle Runtime Smoke Test: added `src/webui/tests/smoke-bundle.js` and integrated it into `src/webui/package.json` `build` script so every build verifies `bundle.js` executes cleanly through `DOMContentLoaded` registration.
+
 ## [2026.11.28] - 2026-11-16
 
 ### Added

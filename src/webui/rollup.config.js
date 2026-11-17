@@ -72,9 +72,7 @@ export default {
 			browser: true,
 			preferBuiltins: false
 		}), // Tells Rollup how to find imported modules in node_modules
-		commonjs({
-			transformMixedEsModules: true
-		}), // Converts imported modules to ES modules, if necessary
+		commonjs(), // Converts imported modules to ES modules, if necessary
 		svg(),
 		vue(),
 		postcss(),
