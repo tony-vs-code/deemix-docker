@@ -1,12 +1,27 @@
+import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
+import { v4 as uuidv4 } from 'uuid'
 // @ts-expect-error
 import deemix from 'deemix'
-import { PlexSettings, PlexSection, PlexTestResult, PlexScanResult } from '../types'
+import {
+	PlexSettings,
+	PlexSection,
+	PlexTestResult,
+	PlexScanResult,
+	PlexPinResult,
+	PlexPinStatus,
+	PlexServerConnection,
+	PlexServerResource
+} from '../types'
 import { logger } from './logger'
 
 export const configFolder: string = deemix.utils.localpaths.getConfigFolder()
 export const plexConfigFile = path.join(configFolder, 'plex.json')
+
+const PLEX_TV_API_BASE = 'https://plex.tv/api/v2'
+const PLEX_PRODUCT_NAME = 'Deemix'
+const PLEX_PRODUCT_VERSION = '1.0'
 
 const DEFAULT_PLEX_SETTINGS: PlexSettings = {
 	enabled: false,
@@ -18,6 +33,72 @@ const DEFAULT_PLEX_SETTINGS: PlexSettings = {
 
 let cachedSettings: PlexSettings | null = null
 let debounceTimer: NodeJS.Timeout | null = null
+
+/**
+ * Generates a stable UUID for X-Plex-Client-Identifier using Node's native crypto.randomUUID().
+ */
+function generateClientIdentifier(): string {
+	const cryptoAny = crypto as any
+	if (typeof cryptoAny.randomUUID === 'function') {
+		return cryptoAny.randomUUID()
+	}
+	return uuidv4()
+}
+
+/**
+ * Builds standard Plex.tv v2 API request headers.
+ */
+function getPlexTvHeaders(clientIdentifier: string, token?: string): Record<string, string> {
+	const headers: Record<string, string> = {
+		Accept: 'application/json',
+		'X-Plex-Product': PLEX_PRODUCT_NAME,
+		'X-Plex-Version': PLEX_PRODUCT_VERSION,
+		'X-Plex-Client-Identifier': clientIdentifier
+	}
+	if (token) {
+		headers['X-Plex-Token'] = token
+	}
+	return headers
+}
+
+/**
+ * Executes a Plex.tv API request with a 6s AbortController timeout and JSON parsing.
+ */
+async function fetchPlexTvJson(
+	url: string,
+	method: 'GET' | 'POST',
+	clientIdentifier: string,
+	token?: string,
+	timeoutMs = 6000
+): Promise<{ ok: boolean; status: number; statusText: string; data: any }> {
+	const controller = new AbortController()
+	const timeout = setTimeout(() => controller.abort(), timeoutMs)
+	const fetchFn: typeof fetch = (globalThis as any).fetch || fetch
+
+	try {
+		const response = await fetchFn(url, {
+			method,
+			headers: getPlexTvHeaders(clientIdentifier, token),
+			signal: controller.signal
+		})
+
+		let data: any = null
+		try {
+			data = await response.json()
+		} catch {
+			data = null
+		}
+
+		return {
+			ok: response.ok,
+			status: response.status,
+			statusText: response.statusText,
+			data
+		}
+	} finally {
+		clearTimeout(timeout)
+	}
+}
 
 /**
  * Normalizes a URL string by trimming whitespace and trailing slashes.
@@ -51,30 +132,53 @@ function atomicWriteJson(filePath: string, data: any): void {
 
 /**
  * Loads Plex settings from disk (config/plex.json) or returns defaults.
+ * Auto-generates and persists a stable clientIdentifier UUID on first load.
  */
 export function getPlexSettings(): PlexSettings {
 	if (cachedSettings) {
 		return { ...cachedSettings }
 	}
 
+	let shouldPersist = false
 	try {
 		if (fs.existsSync(plexConfigFile)) {
 			const raw = fs.readFileSync(plexConfigFile, 'utf-8')
 			const parsed = JSON.parse(raw)
+			const existingClientId = typeof parsed.clientIdentifier === 'string' ? parsed.clientIdentifier.trim() : ''
+			const clientIdentifier = existingClientId || generateClientIdentifier()
+			if (!existingClientId) {
+				shouldPersist = true
+			}
 			cachedSettings = {
 				enabled: Boolean(parsed.enabled),
 				serverUrl: normalizeUrl(parsed.serverUrl),
 				token: typeof parsed.token === 'string' ? parsed.token.trim() : '',
 				sectionId: parsed.sectionId != null ? String(parsed.sectionId).trim() : '',
 				autoScanOnComplete:
-					parsed.autoScanOnComplete !== undefined ? Boolean(parsed.autoScanOnComplete) : DEFAULT_PLEX_SETTINGS.autoScanOnComplete
+					parsed.autoScanOnComplete !== undefined ? Boolean(parsed.autoScanOnComplete) : DEFAULT_PLEX_SETTINGS.autoScanOnComplete,
+				clientIdentifier
 			}
 		} else {
-			cachedSettings = { ...DEFAULT_PLEX_SETTINGS }
+			shouldPersist = true
+			cachedSettings = {
+				...DEFAULT_PLEX_SETTINGS,
+				clientIdentifier: generateClientIdentifier()
+			}
 		}
 	} catch (err: any) {
 		logger.warn(`Failed to read plex.json: ${err?.message || err}`)
-		cachedSettings = { ...DEFAULT_PLEX_SETTINGS }
+		cachedSettings = {
+			...DEFAULT_PLEX_SETTINGS,
+			clientIdentifier: generateClientIdentifier()
+		}
+	}
+
+	if (shouldPersist && cachedSettings) {
+		try {
+			atomicWriteJson(plexConfigFile, cachedSettings)
+		} catch (writeErr: any) {
+			logger.warn(`Failed to persist initial Plex clientIdentifier to plex.json: ${writeErr?.message || writeErr}`)
+		}
 	}
 
 	return { ...cachedSettings }
@@ -82,9 +186,14 @@ export function getPlexSettings(): PlexSettings {
 
 /**
  * Saves partial or complete Plex settings to config/plex.json atomically.
+ * Preserves the existing clientIdentifier UUID or generates one if missing.
  */
 export function savePlexSettings(partial: Partial<PlexSettings>): PlexSettings {
 	const current = getPlexSettings()
+	const clientIdentifier =
+		typeof partial.clientIdentifier === 'string' && partial.clientIdentifier.trim().length > 0
+			? partial.clientIdentifier.trim()
+			: current.clientIdentifier || generateClientIdentifier()
 
 	const updated: PlexSettings = {
 		enabled: partial.enabled !== undefined ? Boolean(partial.enabled) : current.enabled,
@@ -92,7 +201,8 @@ export function savePlexSettings(partial: Partial<PlexSettings>): PlexSettings {
 		token: partial.token !== undefined ? String(partial.token).trim() : current.token,
 		sectionId: partial.sectionId !== undefined ? String(partial.sectionId).trim() : current.sectionId,
 		autoScanOnComplete:
-			partial.autoScanOnComplete !== undefined ? Boolean(partial.autoScanOnComplete) : current.autoScanOnComplete
+			partial.autoScanOnComplete !== undefined ? Boolean(partial.autoScanOnComplete) : current.autoScanOnComplete,
+		clientIdentifier
 	}
 
 	try {
@@ -372,4 +482,183 @@ export function schedulePlexScan(): void {
 			logger.error(`Scheduled Plex scan encountered an error: ${err?.message || err}`)
 		})
 	}, 3000)
+}
+
+/**
+ * Formats an upstream Plex.tv fetch error, normalizing AbortController timeouts.
+ */
+function formatPlexTvError(err: any, fallback: string): string {
+	const isTimeout = err?.name === 'AbortError' || err?.code === 'ABORT_ERR'
+	if (isTimeout) {
+		return 'Request to Plex.tv timed out after 6 seconds'
+	}
+	return err?.message || fallback
+}
+
+/**
+ * Creates a strong Plex.tv OAuth PIN and returns the PIN metadata + auth URL.
+ */
+export async function createPlexPin(): Promise<PlexPinResult> {
+	const settings = getPlexSettings()
+	const clientIdentifier = settings.clientIdentifier || generateClientIdentifier()
+
+	try {
+		const { ok, status, statusText, data } = await fetchPlexTvJson(
+			`${PLEX_TV_API_BASE}/pins?strong=true`,
+			'POST',
+			clientIdentifier
+		)
+
+		if (!ok || !data?.id || !data?.code) {
+			const apiMsg = data?.errors?.[0]?.message || `HTTP ${status} (${statusText})`
+			throw new Error(`Failed to create Plex PIN: ${apiMsg}`)
+		}
+
+		const id = Number(data.id)
+		const code = String(data.code)
+		const authUrl = `https://app.plex.tv/auth#?clientID=${encodeURIComponent(clientIdentifier)}&code=${encodeURIComponent(
+			code
+		)}&context%5Bdevice%5D%5Bproduct%5D=Deemix`
+
+		logger.info(`Created Plex.tv OAuth PIN (${id})`)
+		return {
+			id,
+			code,
+			clientIdentifier,
+			authUrl
+		}
+	} catch (err: any) {
+		const message = formatPlexTvError(err, 'Failed to create Plex.tv OAuth PIN')
+		logger.warn(`Plex OAuth PIN creation failed: ${message}`)
+		throw new Error(message)
+	}
+}
+
+/**
+ * Polls Plex.tv for PIN authorization status and persists authToken when granted.
+ */
+export async function checkPlexPin(pinId: string | number): Promise<PlexPinStatus> {
+	const id = String(pinId ?? '').trim()
+	if (!id) {
+		return { authenticated: false, error: 'PIN ID is required' }
+	}
+
+	const settings = getPlexSettings()
+	const clientIdentifier = settings.clientIdentifier || generateClientIdentifier()
+
+	try {
+		const { ok, status, statusText, data } = await fetchPlexTvJson(
+			`${PLEX_TV_API_BASE}/pins/${encodeURIComponent(id)}`,
+			'GET',
+			clientIdentifier
+		)
+
+		if (status === 404) {
+			return {
+				authenticated: false,
+				expired: true,
+				error: 'Plex authorization PIN expired or was not found'
+			}
+		}
+
+		if (!ok) {
+			const apiMsg = data?.errors?.[0]?.message || `HTTP ${status} (${statusText})`
+			throw new Error(`Plex.tv PIN status check failed: ${apiMsg}`)
+		}
+
+		const authToken = typeof data?.authToken === 'string' ? data.authToken.trim() : ''
+		if (authToken) {
+			savePlexSettings({ token: authToken })
+			logger.info(`Plex.tv OAuth PIN (${id}) authenticated successfully`)
+			return {
+				authenticated: true,
+				token: authToken
+			}
+		}
+
+		return { authenticated: false }
+	} catch (err: any) {
+		const message = formatPlexTvError(err, 'Failed to check Plex.tv PIN status')
+		logger.warn(`Plex OAuth PIN check failed: ${message}`)
+		throw new Error(message)
+	}
+}
+
+/**
+ * Checks whether a Plex resource `provides` field includes 'server'.
+ */
+function providesServer(provides: unknown): boolean {
+	if (typeof provides === 'string') {
+		return provides
+			.split(',')
+			.map(part => part.trim().toLowerCase())
+			.includes('server')
+	}
+	if (Array.isArray(provides)) {
+		return provides.some(part => String(part).trim().toLowerCase() === 'server')
+	}
+	return false
+}
+
+/**
+ * Fetches discovered Plex Media Servers and their connection URIs from plex.tv.
+ */
+export async function fetchPlexServers(token?: string): Promise<PlexServerResource[]> {
+	const settings = getPlexSettings()
+	const plexToken = token !== undefined && token !== null && String(token).trim() !== '' ? String(token).trim() : settings.token
+
+	if (!plexToken) {
+		throw new Error('Plex token is required to discover servers')
+	}
+
+	const clientIdentifier = settings.clientIdentifier || generateClientIdentifier()
+
+	try {
+		const { ok, status, statusText, data } = await fetchPlexTvJson(
+			`${PLEX_TV_API_BASE}/resources?includeHttps=1&includeRelay=1`,
+			'GET',
+			clientIdentifier,
+			plexToken
+		)
+
+		if (!ok) {
+			if (status === 401) {
+				throw new Error('Unauthorized: Invalid or expired Plex token')
+			}
+			const apiMsg = data?.errors?.[0]?.message || `HTTP ${status} (${statusText})`
+			throw new Error(`Failed to fetch Plex servers: ${apiMsg}`)
+		}
+
+		const resources: any[] = Array.isArray(data) ? data : []
+		const servers: PlexServerResource[] = resources
+			.filter(res => res && providesServer(res.provides))
+			.map(res => {
+				const rawConnections: any[] = Array.isArray(res.connections) ? res.connections : []
+				const connections: PlexServerConnection[] = rawConnections
+					.filter(conn => conn && typeof conn.uri === 'string' && conn.uri.trim().length > 0)
+					.map(conn => {
+						const uri = normalizeUrl(conn.uri)
+						return {
+							uri,
+							local: Boolean(conn.local),
+							relay: Boolean(conn.relay),
+							protocol: String(conn.protocol || (uri.toLowerCase().startsWith('https') ? 'https' : 'http'))
+						}
+					})
+
+				return {
+					name: String(res.name || 'Plex Media Server'),
+					clientIdentifier: String(res.clientIdentifier || ''),
+					owned: Boolean(res.owned),
+					connections
+				}
+			})
+
+		logger.info(`Discovered ${servers.length} Plex Media Server(s) via plex.tv`)
+		return servers
+	} catch (err: any) {
+		const message = formatPlexTvError(err, 'Failed to fetch Plex servers from plex.tv')
+		logger.warn(`Plex server discovery failed: ${message}`)
+		throw new Error(message)
+	}
 }
