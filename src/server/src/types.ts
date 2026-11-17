@@ -272,6 +272,35 @@ export interface PlexSettings {
 	token: string
 	sectionId: string
 	autoScanOnComplete: boolean
+	clientIdentifier?: string
+}
+
+export interface PlexPinResult {
+	id: number
+	code: string
+	clientIdentifier: string
+	authUrl: string
+}
+
+export interface PlexPinStatus {
+	authenticated: boolean
+	token?: string
+	expired?: boolean
+	error?: string
+}
+
+export interface PlexServerConnection {
+	uri: string
+	local: boolean
+	relay: boolean
+	protocol: string
+}
+
+export interface PlexServerResource {
+	name: string
+	clientIdentifier: string
+	owned: boolean
+	connections: PlexServerConnection[]
 }
 
 export interface PlexSection {

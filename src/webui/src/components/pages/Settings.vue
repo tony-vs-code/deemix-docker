@@ -1232,41 +1232,193 @@
 
 						<div class="toggles-divider"></div>
 
-						<!-- Connection Config (URL + Token) -->
-						<div class="form-grid-2">
-							<label class="input-field-group">
-								<span class="field-label">{{ $t('settings.plex.serverUrl') }}</span>
-								<input
-									v-model="plexSettings.serverUrl"
-									type="text"
-									:placeholder="$t('settings.plex.serverUrlPlaceholder')"
-									class="modern-input"
-									autocomplete="off"
-								/>
-								<span class="field-hint">Base URL of your Plex Media Server (e.g. http://192.168.1.50:32400)</span>
-							</label>
+						<!-- Sonarr-Style Plex.tv OAuth Authentication Section -->
+						<div class="plex-oauth-panel">
+							<div class="plex-oauth-header">
+								<div class="plex-oauth-info">
+									<div class="flex-align-center gap-2 flex-wrap">
+										<span class="field-label">{{ $t('settings.plex.oauthBannerTitle') }}</span>
+										<span
+											class="plex-status-pill"
+											:class="plexSettings.token ? 'status-pill--active' : 'plex-status-pill--muted'"
+										>
+											<span class="status-dot"></span>
+											{{ plexSettings.token ? $t('settings.plex.signedIn') : $t('settings.plex.notSignedIn') }}
+										</span>
+									</div>
+									<p class="field-hint">{{ $t('settings.plex.oauthBannerDesc') }}</p>
+								</div>
 
-							<label class="input-field-group">
-								<span class="field-label">{{ $t('settings.plex.token') }}</span>
-								<div class="input-with-button">
+								<div class="plex-oauth-actions">
+									<button
+										type="button"
+										class="btn plex-oauth-btn"
+										:disabled="plexAuthLoading || plexAuthPolling"
+										@click="startPlexOAuth"
+									>
+										<i class="material-icons btn-icon text-sm" :class="{ 'spin-animation': plexAuthLoading || plexAuthPolling }">
+											{{ plexAuthLoading || plexAuthPolling ? 'sync' : 'login' }}
+										</i>
+										<span>
+											{{
+												plexSettings.token
+													? $t('settings.plex.reauthenticatePlex')
+													: $t('settings.plex.signInWithPlex')
+											}}
+										</span>
+									</button>
+
+									<button
+										v-if="plexSettings.token"
+										type="button"
+										class="btn btn-secondary"
+										:disabled="isLoadingPlexServers || plexAuthPolling"
+										@click="fetchPlexServers(false)"
+									>
+										<i class="material-icons btn-icon text-sm" :class="{ 'spin-animation': isLoadingPlexServers }">
+											{{ isLoadingPlexServers ? 'sync' : 'dns' }}
+										</i>
+										<span>
+											{{ isLoadingPlexServers ? $t('settings.plex.refreshingServers') : $t('settings.plex.refreshServers') }}
+										</span>
+									</button>
+
+									<button
+										v-if="plexSettings.token"
+										type="button"
+										class="btn btn-danger"
+										:disabled="plexAuthLoading"
+										@click="disconnectPlex"
+									>
+										<i class="material-icons btn-icon text-sm">link_off</i>
+										<span>{{ $t('settings.plex.disconnectPlex') }}</span>
+									</button>
+								</div>
+							</div>
+
+							<!-- Polling / Fallback Auth Link Banner -->
+							<div v-if="plexAuthPolling" class="plex-oauth-waiting">
+								<div class="plex-oauth-waiting-row">
+									<div class="flex-align-center gap-2">
+										<i class="material-icons spin-animation plex-waiting-icon">sync</i>
+										<div>
+											<div class="plex-waiting-title">{{ $t('settings.plex.waitingForAuth') }}</div>
+											<div class="plex-waiting-desc">{{ $t('settings.plex.waitingForAuthDesc') }}</div>
+										</div>
+									</div>
+									<button type="button" class="btn btn-secondary btn-sm" @click="cancelPlexOAuth">
+										{{ $t('settings.plex.cancelAuth') }}
+									</button>
+								</div>
+
+								<div v-if="plexAuthUrl" class="plex-fallback-link-box">
+									<span v-if="plexAuthPopupBlocked" class="plex-popup-blocked-text">
+										<i class="material-icons text-sm">warning</i>
+										{{ $t('settings.plex.popupBlockedNotice') }}
+									</span>
+									<a
+										:href="plexAuthUrl"
+										target="_blank"
+										rel="noopener noreferrer"
+										class="modern-link-inline plex-auth-link"
+									>
+										<i class="material-icons text-sm">open_in_new</i>
+										<span>{{ $t('settings.plex.openPlexAuthLink') }}</span>
+									</a>
+								</div>
+							</div>
+
+							<!-- OAuth Error Banner -->
+							<div v-if="plexAuthError && !plexAuthPolling" class="plex-oauth-error">
+								<i class="material-icons text-sm">error_outline</i>
+								<span>{{ plexAuthError }}</span>
+							</div>
+						</div>
+
+						<!-- Discovered Plex Servers Dropdown -->
+						<div v-if="plexServers && plexServers.length > 0" class="input-field-group">
+							<span class="field-label">{{ $t('settings.plex.discoveredServers') }}</span>
+							<select
+								:value="plexSettings.serverUrl"
+								class="modern-select"
+								@change="onPlexServerSelect($event.target.value)"
+							>
+								<option value="">{{ $t('settings.plex.selectServerPlaceholder') }}</option>
+								<optgroup
+									v-for="server in plexServers"
+									:key="server.clientIdentifier || server.name"
+									:label="server.name + (server.owned ? '' : ' (Shared)')"
+								>
+									<option
+										v-for="conn in server.connections"
+										:key="conn.uri"
+										:value="conn.uri"
+									>
+										{{ formatPlexConnectionLabel(server, conn) }}
+									</option>
+								</optgroup>
+								<option
+									v-if="plexSettings.serverUrl && !isKnownPlexConnection(plexSettings.serverUrl)"
+									:value="plexSettings.serverUrl"
+								>
+									{{ $t('settings.plex.customServerOption', { url: plexSettings.serverUrl }) }}
+								</option>
+							</select>
+							<span class="field-hint">{{ $t('settings.plex.discoveredServersHint') }}</span>
+						</div>
+
+						<!-- Expandable Manual Server URL & Token Override -->
+						<div class="plex-manual-accordion">
+							<button
+								type="button"
+								class="plex-manual-toggle"
+								@click="showManualPlexConfig = !showManualPlexConfig"
+							>
+								<div class="plex-manual-toggle-left">
+									<i class="material-icons text-sm">tune</i>
+									<div>
+										<span class="plex-manual-title">{{ $t('settings.plex.manualConfigToggle') }}</span>
+										<span class="plex-manual-subtitle">{{ $t('settings.plex.manualConfigDesc') }}</span>
+									</div>
+								</div>
+								<i class="material-icons">{{ showManualPlexConfig ? 'expand_less' : 'expand_more' }}</i>
+							</button>
+
+							<div v-show="showManualPlexConfig" class="plex-manual-body form-grid-2">
+								<label class="input-field-group">
+									<span class="field-label">{{ $t('settings.plex.serverUrl') }}</span>
 									<input
-										v-model="plexSettings.token"
-										:type="showPlexToken ? 'text' : 'password'"
-										:placeholder="$t('settings.plex.tokenPlaceholder')"
+										v-model="plexSettings.serverUrl"
+										type="text"
+										:placeholder="$t('settings.plex.serverUrlPlaceholder')"
 										class="modern-input"
 										autocomplete="off"
 									/>
-									<button
-										type="button"
-										class="btn btn-secondary btn-icon-only"
-										:title="showPlexToken ? 'Hide Token' : 'Show Token'"
-										@click="showPlexToken = !showPlexToken"
-									>
-										<i class="material-icons">{{ showPlexToken ? 'visibility_off' : 'visibility' }}</i>
-									</button>
-								</div>
-								<span class="field-hint">{{ $t('settings.plex.tokenHint') }}</span>
-							</label>
+									<span class="field-hint">Base URL of your Plex Media Server (e.g. http://192.168.1.50:32400)</span>
+								</label>
+
+								<label class="input-field-group">
+									<span class="field-label">{{ $t('settings.plex.token') }}</span>
+									<div class="input-with-button">
+										<input
+											v-model="plexSettings.token"
+											:type="showPlexToken ? 'text' : 'password'"
+											:placeholder="$t('settings.plex.tokenPlaceholder')"
+											class="modern-input"
+											autocomplete="off"
+										/>
+										<button
+											type="button"
+											class="btn btn-secondary btn-icon-only"
+											:title="showPlexToken ? 'Hide Token' : 'Show Token'"
+											@click="showPlexToken = !showPlexToken"
+										>
+											<i class="material-icons">{{ showPlexToken ? 'visibility_off' : 'visibility' }}</i>
+										</button>
+									</div>
+									<span class="field-hint">{{ $t('settings.plex.tokenHint') }}</span>
+								</label>
+							</div>
 						</div>
 
 						<!-- Test Connection & Status Row -->
@@ -1828,7 +1980,19 @@ export default {
 			isScanningPlex: false,
 			plexConnectionStatus: null,
 			plexServerName: '',
-			plexErrorMessage: ''
+			plexErrorMessage: '',
+			plexAuthLoading: false,
+			plexAuthPolling: false,
+			plexAuthPinId: null,
+			plexAuthUrl: '',
+			plexAuthPopupBlocked: false,
+			plexAuthError: '',
+			plexAuthPollTimer: null,
+			plexAuthExpiresAt: 0,
+			plexAuthPopup: null,
+			plexServers: [],
+			isLoadingPlexServers: false,
+			showManualPlexConfig: false
 		}
 	},
 	computed: {
@@ -2045,6 +2209,8 @@ export default {
 		} else if (this.currentTab === 'logs') {
 			this.fetchLogs()
 			this.fetchPermissions()
+		} else if (this.currentTab === 'plex') {
+			this.fetchPlexSettings()
 		}
 		if (this.currentTab === 'logs' && this.logAutoRefresh) {
 			this.startAutoRefresh()
@@ -2052,6 +2218,11 @@ export default {
 	},
 	deactivated() {
 		this.stopAutoRefresh()
+		this.stopPlexAuthPolling()
+	},
+	beforeDestroy() {
+		this.stopAutoRefresh()
+		this.stopPlexAuthPolling()
 	},
 	async mounted() {
 		const { settingsData, defaultSettingsData, spotifyCredentials } = await getSettingsData()
@@ -2476,10 +2647,267 @@ export default {
 						sectionId: data.sectionId || '',
 						autoScanOnComplete: data.autoScanOnComplete !== undefined ? Boolean(data.autoScanOnComplete) : true
 					}
+					if (this.plexSettings.serverUrl && this.plexServers.length === 0) {
+						this.showManualPlexConfig = true
+					}
+					if (this.plexSettings.token && this.currentTab === 'plex' && this.plexServers.length === 0) {
+						this.fetchPlexServers(true)
+					}
 				}
 			} catch (err) {
 				console.error('Failed to fetch Plex settings:', err)
 			}
+		},
+		stopPlexAuthPolling() {
+			if (this.plexAuthPollTimer) {
+				clearTimeout(this.plexAuthPollTimer)
+				this.plexAuthPollTimer = null
+			}
+			this.plexAuthPolling = false
+		},
+		closePlexAuthPopup() {
+			if (this.plexAuthPopup) {
+				try {
+					if (!this.plexAuthPopup.closed) {
+						this.plexAuthPopup.close()
+					}
+				} catch {
+					// Ignore cross-origin window close restrictions
+				}
+				this.plexAuthPopup = null
+			}
+		},
+		cancelPlexOAuth() {
+			this.stopPlexAuthPolling()
+			this.plexAuthPinId = null
+			this.plexAuthUrl = ''
+			this.plexAuthPopupBlocked = false
+			this.closePlexAuthPopup()
+		},
+		failPlexOAuth(message) {
+			this.stopPlexAuthPolling()
+			this.plexAuthError = message
+			toast(
+				this.$t('settings.plex.toasts.authFailed', {
+					error: message
+				}),
+				'error'
+			)
+		},
+		async startPlexOAuth() {
+			this.stopPlexAuthPolling()
+			this.plexAuthLoading = true
+			this.plexAuthError = ''
+			this.plexAuthPopupBlocked = false
+			this.plexAuthUrl = ''
+			this.plexAuthPinId = null
+
+			try {
+				const response = await fetch(`${window.location.origin}${location.base}api/plex/auth/pin`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({})
+				})
+				const res = await response.json().catch(() => null)
+				if (!response.ok || !res || !res.id || !res.authUrl) {
+					throw new Error((res && res.error) || this.$t('settings.plex.toasts.pinCreateFailed'))
+				}
+
+				this.plexAuthPinId = res.id
+				this.plexAuthUrl = res.authUrl
+				this.plexAuthExpiresAt = Date.now() + 120000
+				this.plexAuthPolling = true
+
+				const popup = window.open(res.authUrl, 'plexAuth', 'width=640,height=740')
+				this.plexAuthPopup = popup
+				if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+					this.plexAuthPopupBlocked = true
+				}
+
+				this.schedulePlexPinPoll()
+			} catch (err) {
+				const message = (err && err.message) || this.$t('settings.plex.toasts.pinCreateFailed')
+				this.failPlexOAuth(message)
+			} finally {
+				this.plexAuthLoading = false
+			}
+		},
+		schedulePlexPinPoll() {
+			if (!this.plexAuthPolling || !this.plexAuthPinId) return
+			if (this.plexAuthPollTimer) {
+				clearTimeout(this.plexAuthPollTimer)
+			}
+			this.plexAuthPollTimer = setTimeout(() => {
+				this.pollPlexPinStatus()
+			}, 2000)
+		},
+		async pollPlexPinStatus() {
+			if (!this.plexAuthPolling || !this.plexAuthPinId) return
+
+			if (Date.now() >= this.plexAuthExpiresAt) {
+				this.failPlexOAuth(this.$t('settings.plex.authTimedOut'))
+				return
+			}
+
+			const pinId = this.plexAuthPinId
+			try {
+				const response = await fetch(
+					`${window.location.origin}${location.base}api/plex/auth/pin/${encodeURIComponent(pinId)}`
+				)
+				const data = await response.json().catch(() => null)
+
+				if (!this.plexAuthPolling || this.plexAuthPinId !== pinId) return
+
+				if (data && data.authenticated) {
+					this.stopPlexAuthPolling()
+					this.plexAuthPinId = null
+					this.plexAuthUrl = ''
+					this.plexAuthPopupBlocked = false
+					this.plexAuthError = ''
+					this.closePlexAuthPopup()
+
+					if (data.token) {
+						this.plexSettings.token = data.token
+					}
+
+					this.plexServers = Array.isArray(data.servers) ? data.servers : []
+					if (this.plexServers.length > 0) {
+						this.showManualPlexConfig = false
+					}
+
+					if (!this.plexSettings.serverUrl || !this.plexSettings.serverUrl.trim()) {
+						const defaultUri = this.pickDefaultPlexConnection(this.plexServers)
+						if (defaultUri) {
+							this.plexSettings.serverUrl = defaultUri
+						}
+					}
+
+					toast(this.$t('settings.plex.toasts.authSuccess'), 'done')
+
+					if (data.serverDiscoveryError) {
+						toast(
+							this.$t('settings.plex.toasts.serversRefreshFailed', {
+								error: data.serverDiscoveryError
+							}),
+							'error'
+						)
+					}
+
+					if (this.plexSettings.serverUrl && this.plexSettings.token) {
+						await this.testPlexConnection()
+					}
+					return
+				}
+
+				if ((data && data.expired) || response.status === 404) {
+					this.failPlexOAuth((data && data.error) || this.$t('settings.plex.authExpired'))
+					return
+				}
+			} catch (err) {
+				console.warn('Plex PIN poll attempt encountered an error:', err)
+			}
+
+			if (this.plexAuthPolling && this.plexAuthPinId === pinId) {
+				if (Date.now() >= this.plexAuthExpiresAt) {
+					this.failPlexOAuth(this.$t('settings.plex.authTimedOut'))
+				} else {
+					this.schedulePlexPinPoll()
+				}
+			}
+		},
+		pickDefaultPlexConnection(servers) {
+			if (!Array.isArray(servers) || servers.length === 0) return ''
+			const ownedServer = servers.find(s => s.owned && Array.isArray(s.connections) && s.connections.length > 0)
+			const targetServer = ownedServer || servers.find(s => Array.isArray(s.connections) && s.connections.length > 0)
+			if (!targetServer) return ''
+			const localNonRelay = targetServer.connections.find(c => c.local && !c.relay)
+			if (localNonRelay) return localNonRelay.uri
+			const localConn = targetServer.connections.find(c => c.local)
+			if (localConn) return localConn.uri
+			const nonRelay = targetServer.connections.find(c => !c.relay)
+			if (nonRelay) return nonRelay.uri
+			return targetServer.connections[0].uri || ''
+		},
+		async fetchPlexServers(silent = false) {
+			if (!this.plexSettings.token) return
+			this.isLoadingPlexServers = true
+			try {
+				const url = new URL(`${window.location.origin}${location.base}api/plex/servers`)
+				url.searchParams.set('token', this.plexSettings.token)
+				const response = await fetch(url.href)
+				const data = await response.json().catch(() => null)
+				if (!response.ok) {
+					throw new Error((data && data.error) || `HTTP ${response.status}`)
+				}
+				this.plexServers = Array.isArray(data && data.servers) ? data.servers : []
+				if (this.plexServers.length > 0 && (!this.plexSettings.serverUrl || !this.plexSettings.serverUrl.trim())) {
+					const defaultUri = this.pickDefaultPlexConnection(this.plexServers)
+					if (defaultUri) {
+						this.plexSettings.serverUrl = defaultUri
+					}
+				}
+				if (!silent) {
+					toast(
+						this.$t('settings.plex.toasts.serversRefreshed', {
+							count: this.plexServers.length
+						}),
+						'done'
+					)
+				}
+			} catch (err) {
+				if (!silent) {
+					toast(
+						this.$t('settings.plex.toasts.serversRefreshFailed', {
+							error: (err && err.message) || 'Unknown error'
+						}),
+						'error'
+					)
+				}
+			} finally {
+				this.isLoadingPlexServers = false
+			}
+		},
+		onPlexServerSelect(uri) {
+			this.plexSettings.serverUrl = uri || ''
+			if (this.plexSettings.serverUrl && this.plexSettings.token) {
+				this.testPlexConnection()
+			}
+		},
+		isKnownPlexConnection(uri) {
+			if (!uri || !Array.isArray(this.plexServers)) return false
+			return this.plexServers.some(
+				server => Array.isArray(server.connections) && server.connections.some(conn => conn.uri === uri)
+			)
+		},
+		formatPlexConnectionLabel(server, conn) {
+			const tags = []
+			if (conn.relay) {
+				tags.push('Relay')
+			} else if (conn.local) {
+				tags.push('Local')
+			} else {
+				tags.push('Remote')
+			}
+			if (conn.protocol) {
+				tags.push(String(conn.protocol).toUpperCase())
+			}
+			return `${server.name} — ${tags.join(' • ')} — ${conn.uri}`
+		},
+		async disconnectPlex() {
+			this.cancelPlexOAuth()
+			this.plexSettings.token = ''
+			this.plexServers = []
+			this.plexSections = []
+			this.plexConnectionStatus = null
+			this.plexServerName = ''
+			this.plexErrorMessage = ''
+			this.plexAuthError = ''
+			try {
+				await postToServer('plex/settings', this.plexSettings)
+			} catch (err) {
+				console.warn('Failed to persist Plex disconnect:', err)
+			}
+			toast(this.$t('settings.plex.toasts.disconnected'), 'done')
 		},
 		async savePlexSettings() {
 			this.isSavingPlex = true
@@ -4272,6 +4700,184 @@ export default {
 	width: 7px;
 	height: 7px;
 	border-radius: 9999px;
+}
+
+.plex-status-pill--muted {
+	background: rgba(100, 116, 139, 0.16);
+	border: 1px solid rgba(148, 163, 184, 0.25);
+	color: #94a3b8;
+}
+
+.plex-status-pill--muted .status-dot {
+	background: #64748b;
+}
+
+.plex-oauth-panel {
+	background: rgba(30, 41, 59, 0.45);
+	border: 1px solid rgba(245, 158, 11, 0.2);
+	border-radius: 0.875rem;
+	padding: 1.125rem 1.25rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+}
+
+.plex-oauth-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+}
+
+.plex-oauth-info {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	flex: 1;
+	min-width: 240px;
+}
+
+.plex-oauth-actions {
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	flex-wrap: wrap;
+}
+
+.plex-oauth-actions .btn {
+	gap: 0.45rem;
+}
+
+.plex-oauth-btn {
+	background: linear-gradient(135deg, #e5a00d 0%, #d97706 100%);
+	color: #0f172a;
+	font-weight: 700;
+	box-shadow: 0 4px 14px rgba(229, 160, 13, 0.3);
+	gap: 0.45rem;
+}
+
+.plex-oauth-btn:hover {
+	filter: brightness(1.08);
+	box-shadow: 0 6px 20px rgba(229, 160, 13, 0.45);
+}
+
+.plex-oauth-waiting {
+	background: rgba(15, 23, 42, 0.65);
+	border: 1px solid rgba(245, 158, 11, 0.28);
+	border-radius: 0.75rem;
+	padding: 0.875rem 1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.65rem;
+}
+
+.plex-oauth-waiting-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+}
+
+.plex-waiting-icon {
+	color: #fbbf24;
+}
+
+.plex-waiting-title {
+	font-size: 0.875rem;
+	font-weight: 600;
+	color: #fbbf24;
+}
+
+.plex-waiting-desc {
+	font-size: 0.775rem;
+	color: #94a3b8;
+}
+
+.plex-fallback-link-box {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	padding-top: 0.5rem;
+	border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.plex-popup-blocked-text {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.8rem;
+	font-weight: 500;
+	color: #fbbf24;
+}
+
+.plex-auth-link {
+	font-weight: 600;
+	gap: 0.35rem;
+}
+
+.plex-oauth-error {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	background: rgba(239, 68, 68, 0.12);
+	border: 1px solid rgba(239, 68, 68, 0.3);
+	border-radius: 0.625rem;
+	padding: 0.65rem 0.875rem;
+	color: #fca5a5;
+	font-size: 0.8125rem;
+}
+
+.plex-manual-accordion {
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 0.875rem;
+	background: rgba(15, 23, 42, 0.4);
+	overflow: hidden;
+}
+
+.plex-manual-toggle {
+	width: 100%;
+	background: transparent;
+	border: none;
+	padding: 0.875rem 1.125rem;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	cursor: pointer;
+	color: #cbd5e1;
+	text-align: left;
+	transition: background 0.15s ease;
+}
+
+.plex-manual-toggle:hover {
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.plex-manual-toggle-left {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+}
+
+.plex-manual-title {
+	display: block;
+	font-size: 0.85rem;
+	font-weight: 600;
+	color: #e2e8f0;
+}
+
+.plex-manual-subtitle {
+	display: block;
+	font-size: 0.75rem;
+	color: #64748b;
+}
+
+.plex-manual-body {
+	padding: 1rem 1.125rem 1.125rem 1.125rem;
+	border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .plex-footer-actions {

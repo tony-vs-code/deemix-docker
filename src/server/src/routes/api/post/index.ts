@@ -19,6 +19,7 @@ import reorderQueue from './reorderQueue'
 import plexSettings from './plexSettings'
 import plexTest from './plexTest'
 import plexScan from './plexScan'
+import plexAuthPin from './plexAuthPin'
 
 export default [
 	changeAccount,
@@ -41,5 +42,6 @@ export default [
 	reorderQueue,
 	plexSettings,
 	plexTest,
-	plexScan
+	plexScan,
+	plexAuthPin
 ]

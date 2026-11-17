@@ -27,6 +27,8 @@ import checkPermissions from './checkPermissions'
 import getLogs from './getLogs'
 import exportLogs from './exportLogs'
 import plexSettings from './plexSettings'
+import plexAuthPinStatus from './plexAuthPinStatus'
+import plexServers from './plexServers'
 
 export default [
 	connect,
@@ -57,5 +59,7 @@ export default [
 	checkPermissions,
 	getLogs,
 	exportLogs,
-	plexSettings
+	plexSettings,
+	plexAuthPinStatus,
+	plexServers
 ]
