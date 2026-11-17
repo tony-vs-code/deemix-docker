@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.27] - 2026-11-16
+
+### Changed
+- WebUI Build Tooling Modernization: updated `rollup.config.js` to standard `'es'` output format, `fs.readFileSync` package version loading, browser-first resolution, and `node_modules`-scoped `onwarn` filtering; modernized `src/webui/package.json` build scripts with `yarn` chaining, `esbuild --target=es2020`, and `BROWSERSLIST_IGNORE_OLD_DATA=1`.
+- Codebase Lint & Vue 3 Prep Cleanup: resolved all ESLint issues across `Library.vue`, `app.js`, `TheContextMenu.vue`, `TheSearchBar.vue`, `Downloads.vue`, `Search.vue`, and `artist.js`.
+
+### Added
+- Vue 3 Migration Checklist: added `src/webui/VUE3_MIGRATION.md` documenting Vue 3 readiness and upgrade paths for Router, Vuex, I18n, EventBus, and lifecycle hooks.
+
 ## [2026.11.26] - 2026-11-16
 
 ### Added
