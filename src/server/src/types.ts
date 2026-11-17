@@ -265,3 +265,30 @@ export interface ArlHealthResponse {
 	expiringSoon: boolean
 	deezerReachable?: boolean
 }
+
+export interface PlexSettings {
+	enabled: boolean
+	serverUrl: string
+	token: string
+	sectionId: string
+	autoScanOnComplete: boolean
+}
+
+export interface PlexSection {
+	id: string
+	title: string
+	type: string
+}
+
+export interface PlexTestResult {
+	success: boolean
+	serverName?: string
+	sections: PlexSection[]
+	error?: string
+}
+
+export interface PlexScanResult {
+	success: boolean
+	message?: string
+	error?: string
+}

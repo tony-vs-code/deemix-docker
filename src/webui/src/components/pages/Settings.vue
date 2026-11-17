@@ -1197,6 +1197,185 @@
 				</div>
 			</div>
 
+			<!-- TAB: PLEX MEDIA SERVER -->
+			<div v-show="currentTab === 'plex'" class="tab-content-panel space-y-6">
+				<div class="settings-card plex-card">
+					<div class="card-header">
+						<div class="card-icon-box card-icon-amber">
+							<i class="material-icons">cast_connected</i>
+						</div>
+						<div class="card-titles">
+							<div class="flex-align-center gap-2 flex-wrap">
+								<h3 class="card-title">{{ $t('settings.plex.title') }}</h3>
+								<span v-if="plexConnectionStatus" class="plex-status-pill" :class="plexStatusPillClass">
+									<span class="status-dot"></span>
+									{{ plexStatusText }}
+								</span>
+							</div>
+							<p class="card-subtitle">{{ $t('settings.plex.subtitle') }}</p>
+						</div>
+						<div class="header-actions-end">
+							<button
+								type="button"
+								class="btn btn-secondary btn-sm"
+								:disabled="isTestingPlex || !plexSettings.serverUrl || !plexSettings.token"
+								:title="$t('settings.plex.testConnection')"
+								@click="testPlexConnection"
+							>
+								<i class="material-icons btn-icon text-sm" :class="{ 'spin-animation': isTestingPlex }">refresh</i>
+								<span>{{ isTestingPlex ? $t('settings.plex.testing') : $t('settings.plex.testConnection') }}</span>
+							</button>
+						</div>
+					</div>
+
+					<div class="card-body space-y-6">
+						<!-- Enable Plex Integration Switch -->
+						<div class="toggles-list">
+							<label class="modern-toggle-item">
+								<input v-model="plexSettings.enabled" type="checkbox" class="modern-checkbox" />
+								<div class="toggle-text-block">
+									<span class="toggle-title">{{ $t('settings.plex.enable') }}</span>
+									<span class="toggle-desc">{{ $t('settings.plex.enableDesc') }}</span>
+								</div>
+							</label>
+						</div>
+
+						<div class="toggles-divider"></div>
+
+						<!-- Connection Config (URL + Token) -->
+						<div class="form-grid-2">
+							<label class="input-field-group">
+								<span class="field-label">{{ $t('settings.plex.serverUrl') }}</span>
+								<input
+									v-model="plexSettings.serverUrl"
+									type="text"
+									:placeholder="$t('settings.plex.serverUrlPlaceholder')"
+									class="modern-input"
+									autocomplete="off"
+								/>
+								<span class="field-hint">Base URL of your Plex Media Server (e.g. http://192.168.1.50:32400)</span>
+							</label>
+
+							<label class="input-field-group">
+								<span class="field-label">{{ $t('settings.plex.token') }}</span>
+								<div class="input-with-button">
+									<input
+										v-model="plexSettings.token"
+										:type="showPlexToken ? 'text' : 'password'"
+										:placeholder="$t('settings.plex.tokenPlaceholder')"
+										class="modern-input"
+										autocomplete="off"
+									/>
+									<button
+										type="button"
+										class="btn btn-secondary btn-icon-only"
+										:title="showPlexToken ? 'Hide Token' : 'Show Token'"
+										@click="showPlexToken = !showPlexToken"
+									>
+										<i class="material-icons">{{ showPlexToken ? 'visibility_off' : 'visibility' }}</i>
+									</button>
+								</div>
+								<span class="field-hint">{{ $t('settings.plex.tokenHint') }}</span>
+							</label>
+						</div>
+
+						<!-- Test Connection & Status Row -->
+						<div class="flex-align-center gap-3 flex-wrap">
+							<button
+								type="button"
+								class="btn btn-secondary"
+								:disabled="isTestingPlex || !plexSettings.serverUrl || !plexSettings.token"
+								@click="testPlexConnection"
+							>
+								<i class="material-icons btn-icon text-sm" :class="{ 'spin-animation': isTestingPlex }">
+									{{ isTestingPlex ? 'sync' : 'network_check' }}
+								</i>
+								<span>{{ isTestingPlex ? $t('settings.plex.testing') : $t('settings.plex.testConnection') }}</span>
+							</button>
+
+							<span v-if="plexConnectionStatus" class="plex-status-pill" :class="plexStatusPillClass">
+								<span class="status-dot"></span>
+								{{ plexStatusText }}
+							</span>
+						</div>
+
+						<div class="toggles-divider"></div>
+
+						<!-- Library Section Selection & Manual Section Fallback -->
+						<div class="form-grid-2">
+							<div v-if="plexSections && plexSections.length > 0" class="input-field-group">
+								<span class="field-label">{{ $t('settings.plex.librarySection') }}</span>
+								<select v-model="plexSettings.sectionId" class="modern-select">
+									<option value="all">{{ $t('settings.plex.allSections') }}</option>
+									<option
+										v-for="sec in plexSections"
+										:key="sec.id"
+										:value="sec.id"
+									>
+										{{ sec.title }} ({{ sec.type === 'artist' ? 'Music' : sec.type }} — ID: {{ sec.id }})
+									</option>
+								</select>
+								<span class="field-hint">Select a detected Plex section or refresh all music sections</span>
+							</div>
+
+							<label class="input-field-group">
+								<span class="field-label">{{ $t('settings.plex.manualSection') }}</span>
+								<input
+									v-model="plexSettings.sectionId"
+									type="text"
+									:placeholder="$t('settings.plex.manualSectionPlaceholder')"
+									class="modern-input"
+									autocomplete="off"
+								/>
+								<span class="field-hint">{{ $t('settings.plex.manualSectionHint') }}</span>
+							</label>
+						</div>
+
+						<div class="toggles-divider"></div>
+
+						<!-- Auto-scan on Complete Toggle -->
+						<div class="toggles-list">
+							<label class="modern-toggle-item">
+								<input v-model="plexSettings.autoScanOnComplete" type="checkbox" class="modern-checkbox" />
+								<div class="toggle-text-block">
+									<span class="toggle-title">{{ $t('settings.plex.autoScan') }}</span>
+									<span class="toggle-desc">{{ $t('settings.plex.autoScanDesc') }}</span>
+								</div>
+							</label>
+						</div>
+
+						<div class="toggles-divider"></div>
+
+						<!-- Save & Trigger Scan Action Buttons -->
+						<div class="plex-footer-actions flex-align-center gap-3 flex-wrap">
+							<button
+								type="button"
+								class="btn btn-primary action-btn"
+								:disabled="isSavingPlex"
+								@click="savePlexSettings"
+							>
+								<i class="material-icons btn-icon text-sm" :class="{ 'spin-animation': isSavingPlex }">
+									{{ isSavingPlex ? 'sync' : 'save' }}
+								</i>
+								<span>{{ isSavingPlex ? $t('settings.plex.saving') : $t('settings.plex.save') }}</span>
+							</button>
+
+							<button
+								type="button"
+								class="btn btn-secondary action-btn"
+								:disabled="isScanningPlex || !plexSettings.serverUrl || !plexSettings.token"
+								@click="triggerPlexScan"
+							>
+								<i class="material-icons btn-icon text-sm" :class="{ 'spin-animation': isScanningPlex }">
+									{{ isScanningPlex ? 'sync' : 'refresh' }}
+								</i>
+								<span>{{ isScanningPlex ? $t('settings.plex.scanning') : $t('settings.plex.scanNow') }}</span>
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+
 			<!-- TAB 7: APPLICATION LOGS -->
 			<div v-show="currentTab === 'logs'" class="tab-content-panel space-y-6">
 				<!-- Permission Diagnostics Card -->
@@ -1604,6 +1783,7 @@ export default {
 				{ id: 'files', label: 'File & Folder Organization', icon: 'create_new_folder' },
 				{ id: 'tags', label: 'Metadata & Tags', icon: 'bookmarks' },
 				{ id: 'artwork', label: 'Artwork & Covers', icon: 'image' },
+				{ id: 'plex', label: 'Plex', icon: 'cast_connected' },
 				{ id: 'logs', label: 'Application Logs', icon: 'receipt_long' }
 			],
 			logs: [],
@@ -1650,7 +1830,22 @@ export default {
 			guideTab: 'chrome',
 			modalArlInput: '',
 			isConnectingModal: false,
-			consoleSnippetText: `copy(document.cookie.split('; ').find(r => r.startsWith('arl='))?.split('=')[1] || '')`
+			consoleSnippetText: `copy(document.cookie.split('; ').find(r => r.startsWith('arl='))?.split('=')[1] || '')`,
+			plexSettings: {
+				enabled: false,
+				serverUrl: '',
+				token: '',
+				sectionId: '',
+				autoScanOnComplete: true
+			},
+			plexSections: [],
+			showPlexToken: false,
+			isTestingPlex: false,
+			isSavingPlex: false,
+			isScanningPlex: false,
+			plexConnectionStatus: null,
+			plexServerName: '',
+			plexErrorMessage: ''
 		}
 	},
 	computed: {
@@ -1790,12 +1985,29 @@ export default {
 				})
 			}
 			return null
+		},
+		plexStatusPillClass() {
+			if (this.plexConnectionStatus === 'success') return 'status-pill--active'
+			if (this.plexConnectionStatus === 'error') return 'status-pill--expired'
+			return ''
+		},
+		plexStatusText() {
+			if (this.plexConnectionStatus === 'success') {
+				return this.plexServerName ? `Connected: ${this.plexServerName}` : 'Connected'
+			}
+			if (this.plexConnectionStatus === 'error') {
+				return this.plexErrorMessage || 'Connection Failed'
+			}
+			return ''
 		}
 	},
 	watch: {
 		currentTab(newTab) {
 			if (newTab === 'account') {
 				this.fetchArlHealth()
+			}
+			if (newTab === 'plex') {
+				this.fetchPlexSettings()
 			}
 			if (newTab === 'logs') {
 				this.fetchLogs()
@@ -1850,6 +2062,7 @@ export default {
 		}
 
 		this.fetchArlHealth()
+		this.fetchPlexSettings()
 
 		this.escListener = e => {
 			if (e.key === 'Escape' && this.showArlModal) {
@@ -1952,6 +2165,9 @@ export default {
 			localStorage.setItem('locale', newLocale)
 		},
 		saveSettings() {
+			if (this.currentTab === 'plex') {
+				this.savePlexSettings()
+			}
 			this.lastSettings = JSON.parse(JSON.stringify(this.settings))
 			this.lastCredentials = JSON.parse(JSON.stringify(this.spotifyFeatures || {}))
 
@@ -2221,6 +2437,108 @@ export default {
 				)
 			} catch (e) {
 				return timestamp
+			}
+		},
+		async fetchPlexSettings() {
+			try {
+				const data = await fetchData('plex/settings')
+				if (data) {
+					this.plexSettings = {
+						enabled: Boolean(data.enabled),
+						serverUrl: data.serverUrl || '',
+						token: data.token || '',
+						sectionId: data.sectionId || '',
+						autoScanOnComplete: data.autoScanOnComplete !== undefined ? Boolean(data.autoScanOnComplete) : true
+					}
+				}
+			} catch (err) {
+				console.error('Failed to fetch Plex settings:', err)
+			}
+		},
+		async savePlexSettings() {
+			this.isSavingPlex = true
+			try {
+				const res = await postToServer('plex/settings', this.plexSettings)
+				if (res && res.success !== false) {
+					toast(this.$t('settings.plex.toasts.saved'), 'done')
+				} else {
+					toast(this.$t('settings.plex.toasts.saveFailed'), 'error')
+				}
+			} catch (err) {
+				console.error('Failed to save Plex settings:', err)
+				toast(this.$t('settings.plex.toasts.saveFailed'), 'error')
+			} finally {
+				this.isSavingPlex = false
+			}
+		},
+		async testPlexConnection() {
+			this.isTestingPlex = true
+			this.plexConnectionStatus = null
+			this.plexErrorMessage = ''
+			try {
+				const res = await postToServer('plex/test', {
+					serverUrl: this.plexSettings.serverUrl,
+					token: this.plexSettings.token
+				})
+				if (res && res.success) {
+					this.plexConnectionStatus = 'success'
+					this.plexServerName = res.serverName || ''
+					this.plexSections = Array.isArray(res.sections) ? res.sections : []
+					const musicCount = this.plexSections.filter(s => s.type === 'artist').length
+					const countText =
+						musicCount > 0 ? `${musicCount} music libraries` : `${this.plexSections.length} libraries`
+					toast(
+						this.$t('settings.plex.toasts.testSuccess', {
+							server: res.serverName || 'Plex',
+							count: countText
+						}),
+						'cast_connected'
+					)
+				} else {
+					this.plexConnectionStatus = 'error'
+					this.plexErrorMessage = res?.error || 'Connection failed'
+					toast(
+						this.$t('settings.plex.toasts.testFailed', {
+							error: this.plexErrorMessage
+						}),
+						'error'
+					)
+				}
+			} catch (err) {
+				this.plexConnectionStatus = 'error'
+				this.plexErrorMessage = err.message || 'Connection failed'
+				toast(
+					this.$t('settings.plex.toasts.testFailed', {
+						error: this.plexErrorMessage
+					}),
+					'error'
+				)
+			} finally {
+				this.isTestingPlex = false
+			}
+		},
+		async triggerPlexScan() {
+			this.isScanningPlex = true
+			try {
+				const res = await postToServer('plex/scan', {
+					serverUrl: this.plexSettings.serverUrl,
+					token: this.plexSettings.token,
+					sectionId: this.plexSettings.sectionId
+				})
+				if (res && res.success) {
+					toast(this.$t('settings.plex.toasts.scanTriggered'), 'refresh')
+				} else {
+					const error = res?.error || 'Scan failed'
+					toast(
+						this.$t('settings.plex.toasts.scanFailed') + (error ? `: ${error}` : ''),
+						'error'
+					)
+				}
+			} catch (err) {
+				console.error('Failed to trigger Plex scan:', err)
+				toast(this.$t('settings.plex.toasts.scanFailed'), 'error')
+			} finally {
+				this.isScanningPlex = false
 			}
 		}
 	}
@@ -3970,5 +4288,31 @@ export default {
 	font-size: 0.775rem;
 	color: #94a3b8;
 	margin: 0;
+}
+
+/* Plex Card Styles */
+.plex-card {
+	border-color: rgba(245, 158, 11, 0.2);
+}
+
+.plex-status-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	font-size: 0.775rem;
+	font-weight: 600;
+	padding: 0.25rem 0.75rem;
+	border-radius: 9999px;
+	letter-spacing: 0.02em;
+}
+
+.plex-status-pill .status-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 9999px;
+}
+
+.plex-footer-actions {
+	padding-top: 0.5rem;
 }
 </style>

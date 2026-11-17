@@ -26,6 +26,7 @@ import searchLibrary from './searchLibrary'
 import checkPermissions from './checkPermissions'
 import getLogs from './getLogs'
 import exportLogs from './exportLogs'
+import plexSettings from './plexSettings'
 
 export default [
 	connect,
@@ -55,5 +56,6 @@ export default [
 	searchLibrary,
 	checkPermissions,
 	getLogs,
-	exportLogs
+	exportLogs,
+	plexSettings
 ]

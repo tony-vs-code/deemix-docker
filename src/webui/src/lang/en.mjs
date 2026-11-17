@@ -585,6 +585,41 @@ const en = {
 				},
 				close: 'Close'
 			}
+		},
+		plex: {
+			title: 'Plex Media Server',
+			subtitle: 'Automatically notify Plex to refresh your music library when downloads complete',
+			enable: 'Enable Plex Integration',
+			enableDesc: 'Send refresh commands to Plex Media Server upon download completion',
+			serverUrl: 'Plex Server URL',
+			serverUrlPlaceholder: 'http://192.168.1.50:32400',
+			token: 'X-Plex-Token',
+			tokenPlaceholder: 'Paste your Plex token here...',
+			tokenHint: 'Find your token in Plex Web under any media item\'s XML info or Account settings',
+			testConnection: 'Test Connection & Load Libraries',
+			testing: 'Testing Connection...',
+			connected: 'Connected to {server}',
+			connectionFailed: 'Connection Failed',
+			librarySection: 'Music Library Section',
+			selectSection: 'Select a music library section',
+			allSections: 'All Music Sections (or All Libraries)',
+			manualSection: 'Manual Section ID',
+			manualSectionPlaceholder: 'e.g. 1 or all',
+			manualSectionHint: 'Leave empty or set to "all" to refresh all music libraries',
+			autoScan: 'Auto-scan on download completion',
+			autoScanDesc: 'Debounces multiple finished tracks (~3s) and triggers a Plex scan automatically',
+			save: 'Save Plex Settings',
+			saving: 'Saving...',
+			scanNow: 'Scan Plex Now',
+			scanning: 'Scanning Plex...',
+			toasts: {
+				saved: 'Plex settings saved successfully!',
+				saveFailed: 'Failed to save Plex settings',
+				scanTriggered: 'Plex library refresh triggered!',
+				scanFailed: 'Failed to trigger Plex library refresh',
+				testSuccess: 'Successfully connected to Plex: {server} ({count})',
+				testFailed: 'Failed to connect to Plex: {error}'
+			}
 		}
 	},
 	sidebar: {
