@@ -23,13 +23,15 @@
 
 			<!-- Rescan Button -->
 			<div class="header-actions">
-				<button
-					class="btn btn-primary action-btn"
-					:disabled="isScanning"
-					@click="rescanLibrary(false)"
-				>
+				<button class="btn btn-primary action-btn" :disabled="isScanning" @click="rescanLibrary(false)">
 					<i class="material-icons btn-icon" :class="{ 'spin-active': isScanning }">sync</i>
-					<span>{{ isScanning ? $t('libraryPage.scanning') : (allAlbums.length > 0 ? $t('libraryPage.rescanLibrary') : $t('libraryPage.scanLibrary')) }}</span>
+					<span>{{
+						isScanning
+							? $t('libraryPage.scanning')
+							: allAlbums.length > 0
+							? $t('libraryPage.rescanLibrary')
+							: $t('libraryPage.scanLibrary')
+					}}</span>
 				</button>
 			</div>
 		</div>
@@ -92,12 +94,7 @@
 					class="search-box-input"
 					@input="handleSearchInput($event.target.value)"
 				/>
-				<button
-					v-if="searchInput"
-					class="search-clear-btn"
-					title="Clear"
-					@click="clearSearch"
-				>
+				<button v-if="searchInput" class="search-clear-btn" title="Clear" @click="clearSearch">
 					<i class="material-icons text-base">close</i>
 				</button>
 			</div>
@@ -137,9 +134,15 @@
 
 				<!-- Results Count Badge -->
 				<div class="results-count-pill">
-					<span v-if="activeView === 'albums'">{{ filteredAlbums.length }} {{ filteredAlbums.length === 1 ? 'Album' : 'Albums' }}</span>
-					<span v-else-if="activeView === 'artists'">{{ filteredArtists.length }} {{ filteredArtists.length === 1 ? 'Artist' : 'Artists' }}</span>
-					<span v-else-if="activeView === 'tracks'">{{ filteredTracks.length }} {{ filteredTracks.length === 1 ? 'Track' : 'Tracks' }}</span>
+					<span v-if="activeView === 'albums'"
+						>{{ filteredAlbums.length }} {{ filteredAlbums.length === 1 ? 'Album' : 'Albums' }}</span
+					>
+					<span v-else-if="activeView === 'artists'"
+						>{{ filteredArtists.length }} {{ filteredArtists.length === 1 ? 'Artist' : 'Artists' }}</span
+					>
+					<span v-else-if="activeView === 'tracks'"
+						>{{ filteredTracks.length }} {{ filteredTracks.length === 1 ? 'Track' : 'Tracks' }}</span
+					>
 				</div>
 			</div>
 		</div>
@@ -156,13 +159,15 @@
 		<!-- 1. ALBUMS VIEW -->
 		<template v-else-if="activeView === 'albums'">
 			<!-- Grid Display Mode -->
-			<div
-				v-if="displayMode === 'grid' && filteredAlbums.length > 0"
-				class="albums-grid"
-			>
+			<div v-if="displayMode === 'grid' && filteredAlbums.length > 0" class="albums-grid">
 				<div
 					v-for="(album, index) in paginatedAlbums"
-					:key="'album-grid-' + (album.path && album.path !== '.' ? album.path : (album.artist + '-' + album.title)) + '-' + index"
+					:key="
+						'album-grid-' +
+						(album.path && album.path !== '.' ? album.path : album.artist + '-' + album.title) +
+						'-' +
+						index
+					"
 					class="album-card group"
 					@click="openAlbumModal(album)"
 				>
@@ -198,9 +203,7 @@
 						</div>
 
 						<!-- Track Count Overlay (Bottom-Right) -->
-						<div class="track-count-overlay">
-							{{ album.tracksCount }} {{ $t('libraryPage.tracks') }}
-						</div>
+						<div class="track-count-overlay">{{ album.tracksCount }} {{ $t('libraryPage.tracks') }}</div>
 
 						<!-- Hover Overlay with Inspect Pill -->
 						<div class="album-hover-overlay">
@@ -226,7 +229,9 @@
 						>
 							<i class="material-icons track-match-icon">audiotrack</i>
 							<span class="track-match-text truncate">Matches track: {{ album.matchedTracks[0] }}</span>
-							<span v-if="album.matchedTracks.length > 1" class="track-match-more">+{{ album.matchedTracks.length - 1 }}</span>
+							<span v-if="album.matchedTracks.length > 1" class="track-match-more"
+								>+{{ album.matchedTracks.length - 1 }}</span
+							>
 						</div>
 						<div class="album-submeta">
 							<span v-if="album.formattedTotalSize" class="album-size">
@@ -238,10 +243,7 @@
 			</div>
 
 			<!-- List Display Mode -->
-			<div
-				v-else-if="displayMode === 'list' && filteredAlbums.length > 0"
-				class="albums-list-container"
-			>
+			<div v-else-if="displayMode === 'list' && filteredAlbums.length > 0" class="albums-list-container">
 				<div class="table-container">
 					<table class="tracks-table">
 						<thead>
@@ -258,7 +260,12 @@
 						<tbody>
 							<tr
 								v-for="(album, index) in paginatedAlbums"
-								:key="'album-list-' + (album.path && album.path !== '.' ? album.path : (album.artist + '-' + album.title)) + '-' + index"
+								:key="
+									'album-list-' +
+									(album.path && album.path !== '.' ? album.path : album.artist + '-' + album.title) +
+									'-' +
+									index
+								"
 								class="track-row album-list-row"
 								@click="openAlbumModal(album)"
 							>
@@ -285,7 +292,9 @@
 									>
 										<i class="material-icons track-match-icon">audiotrack</i>
 										<span class="track-match-text truncate">Matches track: {{ album.matchedTracks[0] }}</span>
-										<span v-if="album.matchedTracks.length > 1" class="track-match-more">+{{ album.matchedTracks.length - 1 }}</span>
+										<span v-if="album.matchedTracks.length > 1" class="track-match-more"
+											>+{{ album.matchedTracks.length - 1 }}</span
+										>
 									</div>
 								</td>
 								<td class="col-artist track-artist-cell" :title="album.artist">
@@ -321,7 +330,9 @@
 			<div v-if="filteredAlbums.length > albumPageSize" class="pagination-bar">
 				<div class="pagination-left">
 					<span class="page-range-text">
-						Showing {{ ((albumCurrentPage - 1) * albumPageSize) + 1 }} - {{ Math.min(albumCurrentPage * albumPageSize, filteredAlbums.length) }} of {{ filteredAlbums.length.toLocaleString() }} albums
+						Showing {{ (albumCurrentPage - 1) * albumPageSize + 1 }} -
+						{{ Math.min(albumCurrentPage * albumPageSize, filteredAlbums.length) }} of
+						{{ filteredAlbums.length.toLocaleString() }} albums
 					</span>
 				</div>
 				<div class="pagination-controls">
@@ -331,13 +342,21 @@
 					<button class="page-btn" :disabled="albumCurrentPage <= 1" title="Previous Page" @click="albumCurrentPage--">
 						<i class="material-icons">chevron_left</i>
 					</button>
-					<span class="page-info">
-						Page {{ albumCurrentPage }} of {{ totalAlbumPages }}
-					</span>
-					<button class="page-btn" :disabled="albumCurrentPage >= totalAlbumPages" title="Next Page" @click="albumCurrentPage++">
+					<span class="page-info"> Page {{ albumCurrentPage }} of {{ totalAlbumPages }} </span>
+					<button
+						class="page-btn"
+						:disabled="albumCurrentPage >= totalAlbumPages"
+						title="Next Page"
+						@click="albumCurrentPage++"
+					>
 						<i class="material-icons">chevron_right</i>
 					</button>
-					<button class="page-btn" :disabled="albumCurrentPage >= totalAlbumPages" title="Last Page" @click="albumCurrentPage = totalAlbumPages">
+					<button
+						class="page-btn"
+						:disabled="albumCurrentPage >= totalAlbumPages"
+						title="Last Page"
+						@click="albumCurrentPage = totalAlbumPages"
+					>
 						<i class="material-icons">last_page</i>
 					</button>
 				</div>
@@ -354,11 +373,7 @@
 				<p class="empty-description">
 					{{ searchQuery ? $t('libraryPage.empty.noSearchMessage') : $t('libraryPage.empty.emptyMessage') }}
 				</p>
-				<button
-					v-if="!searchQuery"
-					class="btn btn-primary mt-6"
-					@click="rescanLibrary(true)"
-				>
+				<button v-if="!searchQuery" class="btn btn-primary mt-6" @click="rescanLibrary(true)">
 					<i class="material-icons mr-1.5 text-base">sync</i>
 					{{ $t('libraryPage.scanLibrary') }}
 				</button>
@@ -367,10 +382,7 @@
 
 		<!-- 2. ARTISTS VIEW -->
 		<template v-else-if="activeView === 'artists'">
-			<div
-				v-if="filteredArtists.length > 0"
-				class="artists-grid"
-			>
+			<div v-if="filteredArtists.length > 0" class="artists-grid">
 				<div
 					v-for="(artist, index) in filteredArtists"
 					:key="'artist-' + artist.name + '-' + index"
@@ -410,10 +422,7 @@
 
 		<!-- 3. ALL TRACKS VIEW -->
 		<template v-else-if="activeView === 'tracks'">
-			<div
-				v-if="filteredTracks.length > 0"
-				class="tracks-view-container"
-			>
+			<div v-if="filteredTracks.length > 0" class="tracks-view-container">
 				<div class="table-container">
 					<table class="tracks-table">
 						<thead>
@@ -438,7 +447,7 @@
 								<td class="col-num track-num-cell">
 									<div class="track-num-wrapper">
 										<span v-if="!isCurrentTrack(track)" class="track-num-text">
-											{{ track.trackNumber || (((trackCurrentPage - 1) * trackPageSize) + index + 1) }}
+											{{ track.trackNumber || (trackCurrentPage - 1) * trackPageSize + index + 1 }}
 										</span>
 										<div v-else-if="isPlaying" class="playing-equalizer-icon" title="Playing">
 											<span></span><span></span><span></span>
@@ -504,23 +513,38 @@
 							<option :value="250">250</option>
 						</select>
 						<span class="page-range-text">
-							Showing {{ ((trackCurrentPage - 1) * trackPageSize) + 1 }} - {{ Math.min(trackCurrentPage * trackPageSize, filteredTracks.length) }} of {{ filteredTracks.length.toLocaleString() }} tracks
+							Showing {{ (trackCurrentPage - 1) * trackPageSize + 1 }} -
+							{{ Math.min(trackCurrentPage * trackPageSize, filteredTracks.length) }} of
+							{{ filteredTracks.length.toLocaleString() }} tracks
 						</span>
 					</div>
 					<div class="pagination-controls">
 						<button class="page-btn" :disabled="trackCurrentPage <= 1" title="First Page" @click="trackCurrentPage = 1">
 							<i class="material-icons">first_page</i>
 						</button>
-						<button class="page-btn" :disabled="trackCurrentPage <= 1" title="Previous Page" @click="trackCurrentPage--">
+						<button
+							class="page-btn"
+							:disabled="trackCurrentPage <= 1"
+							title="Previous Page"
+							@click="trackCurrentPage--"
+						>
 							<i class="material-icons">chevron_left</i>
 						</button>
-						<span class="page-info">
-							Page {{ trackCurrentPage }} of {{ totalTrackPages }}
-						</span>
-						<button class="page-btn" :disabled="trackCurrentPage >= totalTrackPages" title="Next Page" @click="trackCurrentPage++">
+						<span class="page-info"> Page {{ trackCurrentPage }} of {{ totalTrackPages }} </span>
+						<button
+							class="page-btn"
+							:disabled="trackCurrentPage >= totalTrackPages"
+							title="Next Page"
+							@click="trackCurrentPage++"
+						>
 							<i class="material-icons">chevron_right</i>
 						</button>
-						<button class="page-btn" :disabled="trackCurrentPage >= totalTrackPages" title="Last Page" @click="trackCurrentPage = totalTrackPages">
+						<button
+							class="page-btn"
+							:disabled="trackCurrentPage >= totalTrackPages"
+							title="Last Page"
+							@click="trackCurrentPage = totalTrackPages"
+						>
 							<i class="material-icons">last_page</i>
 						</button>
 					</div>
@@ -537,11 +561,7 @@
 		</template>
 
 		<!-- Guaranteed-Visible Album Detail Modal -->
-		<div
-			v-if="selectedAlbum"
-			class="modal-backdrop"
-			@click.self="closeAlbumModal"
-		>
+		<div v-if="selectedAlbum" class="modal-backdrop" @click.self="closeAlbumModal">
 			<div class="modal-card">
 				<!-- Modal Header -->
 				<div class="modal-header">
@@ -593,11 +613,7 @@
 							<i class="material-icons text-base">delete_outline</i>
 							<span>{{ $t('libraryPage.deleteAlbum') }}</span>
 						</button>
-						<button
-							class="modal-close-btn"
-							title="Close (Esc)"
-							@click="closeAlbumModal"
-						>
+						<button class="modal-close-btn" title="Close (Esc)" @click="closeAlbumModal">
 							<i class="material-icons">close</i>
 						</button>
 					</div>
@@ -632,7 +648,7 @@
 									<td class="col-num track-num-cell">
 										<div class="track-num-wrapper">
 											<span v-if="!isCurrentTrack(track)" class="track-num-text">
-												{{ track.trackNumber || (index + 1) }}
+												{{ track.trackNumber || index + 1 }}
 											</span>
 											<div v-else-if="isPlaying" class="playing-equalizer-icon" title="Playing">
 												<span></span><span></span><span></span>
@@ -691,17 +707,17 @@
 		</div>
 
 		<!-- Danger Confirmation Modal -->
-		<div
-			v-if="pendingDelete"
-			class="confirm-modal-backdrop"
-			@click.self="pendingDelete = null"
-		>
+		<div v-if="pendingDelete" class="confirm-modal-backdrop" @click.self="pendingDelete = null">
 			<div class="confirm-modal-card">
 				<div class="confirm-icon-box">
 					<i class="material-icons confirm-danger-icon">warning_amber</i>
 				</div>
 				<h3 class="confirm-modal-title">
-					{{ pendingDelete.type === 'album' ? $t('libraryPage.confirmDeleteAlbumTitle') : $t('libraryPage.confirmDeleteTrackTitle') }}
+					{{
+						pendingDelete.type === 'album'
+							? $t('libraryPage.confirmDeleteAlbumTitle')
+							: $t('libraryPage.confirmDeleteTrackTitle')
+					}}
 				</h3>
 				<p class="confirm-modal-message">
 					{{
@@ -711,18 +727,10 @@
 					}}
 				</p>
 				<div class="confirm-modal-actions">
-					<button
-						class="btn btn-secondary confirm-cancel-btn"
-						:disabled="isDeleting"
-						@click="pendingDelete = null"
-					>
+					<button class="btn btn-secondary confirm-cancel-btn" :disabled="isDeleting" @click="pendingDelete = null">
 						{{ $t('libraryPage.cancel') }}
 					</button>
-					<button
-						class="btn btn-danger confirm-delete-btn"
-						:disabled="isDeleting"
-						@click="executeDelete"
-					>
+					<button class="btn btn-danger confirm-delete-btn" :disabled="isDeleting" @click="executeDelete">
 						<i v-if="isDeleting" class="material-icons btn-icon spin-active mr-1">sync</i>
 						<i v-else class="material-icons btn-icon mr-1">delete_forever</i>
 						<span>{{ isDeleting ? $t('libraryPage.deleting') : $t('libraryPage.deletePermanently') }}</span>
@@ -804,7 +812,13 @@
 					<button
 						class="player-btn player-nav-btn player-toggle-btn"
 						:class="{ 'active-mode': repeatMode !== 'off', 'repeat-one': repeatMode === 'one' }"
-						:title="repeatMode === 'one' ? $t('libraryPage.player.repeatOne') : (repeatMode === 'all' ? $t('libraryPage.player.repeatAll') : $t('libraryPage.player.repeatOff'))"
+						:title="
+							repeatMode === 'one'
+								? $t('libraryPage.player.repeatOne')
+								: repeatMode === 'all'
+								? $t('libraryPage.player.repeatAll')
+								: $t('libraryPage.player.repeatOff')
+						"
 						@click="cycleRepeatMode"
 					>
 						<i class="material-icons">{{ repeatMode === 'one' ? 'repeat_one' : 'repeat' }}</i>
@@ -831,8 +845,12 @@
 				<span class="format-pill mr-2" :class="formatPillClass(currentTrack.format)">
 					{{ (currentTrack.format || 'MP3').toUpperCase() }}
 				</span>
-				<button class="player-btn player-mute-btn" :title="isMuted ? $t('libraryPage.player.unmute') : $t('libraryPage.player.mute')" @click="toggleMute">
-					<i class="material-icons">{{ isMuted || audioVolume === 0 ? 'volume_off' : (audioVolume < 0.5 ? 'volume_down' : 'volume_up') }}</i>
+				<button
+					class="player-btn player-mute-btn"
+					:title="isMuted ? $t('libraryPage.player.unmute') : $t('libraryPage.player.mute')"
+					@click="toggleMute"
+				>
+					<i class="material-icons">{{ volumeIcon }}</i>
 				</button>
 				<input
 					type="range"
@@ -881,7 +899,8 @@ function loadStoredPlayerSettings() {
 			if (muted !== null) {
 				defaults.isMuted = muted === 'true'
 			}
-			const shuffled = window.localStorage.getItem('isShuffled') || window.localStorage.getItem('deemix_player_shuffled')
+			const shuffled =
+				window.localStorage.getItem('isShuffled') || window.localStorage.getItem('deemix_player_shuffled')
 			if (shuffled !== null) {
 				defaults.isShuffled = shuffled === 'true'
 			}
@@ -961,48 +980,12 @@ export default {
 			cachedTracks: []
 		}
 	},
-	watch: {
-		searchQuery() {
-			this.albumCurrentPage = 1
-			this.trackCurrentPage = 1
-		},
-		sortBy() {
-			this.albumCurrentPage = 1
-			this.trackCurrentPage = 1
-		},
-		activeView() {
-			this.albumCurrentPage = 1
-			this.trackCurrentPage = 1
-		},
-		audioVolume(val) {
-			saveStoredPlayerSettings({ audioVolume: val })
-		},
-		isMuted(val) {
-			saveStoredPlayerSettings({ isMuted: val })
-		},
-		isShuffled(val) {
-			saveStoredPlayerSettings({ isShuffled: val })
-		},
-		repeatMode(val) {
-			saveStoredPlayerSettings({ repeatMode: val })
-		},
-		currentTrack(newTrack) {
-			if (newTrack) {
-				this.$nextTick(() => {
-					this.setupMediaSessionActionHandlers()
-					this.updateMediaSessionMetadata()
-				})
-			} else {
-				this.clearMediaSession()
-			}
-		},
-		currentTrackCover() {
-			if (this.currentTrack) {
-				this.updateMediaSessionMetadata()
-			}
-		}
-	},
 	computed: {
+		volumeIcon() {
+			if (this.isMuted || this.audioVolume === 0) return 'volume_off'
+			if (this.audioVolume < 0.5) return 'volume_down'
+			return 'volume_up'
+		},
 		searchPlaceholder() {
 			if (this.activeView === 'artists') return 'Search artists...'
 			if (this.activeView === 'tracks') return 'Search tracks, artists, or albums...'
@@ -1169,6 +1152,47 @@ export default {
 			const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
 			const i = Math.floor(Math.log(totalBytes) / Math.log(k))
 			return `${parseFloat((totalBytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
+		}
+	},
+	watch: {
+		searchQuery() {
+			this.albumCurrentPage = 1
+			this.trackCurrentPage = 1
+		},
+		sortBy() {
+			this.albumCurrentPage = 1
+			this.trackCurrentPage = 1
+		},
+		activeView() {
+			this.albumCurrentPage = 1
+			this.trackCurrentPage = 1
+		},
+		audioVolume(val) {
+			saveStoredPlayerSettings({ audioVolume: val })
+		},
+		isMuted(val) {
+			saveStoredPlayerSettings({ isMuted: val })
+		},
+		isShuffled(val) {
+			saveStoredPlayerSettings({ isShuffled: val })
+		},
+		repeatMode(val) {
+			saveStoredPlayerSettings({ repeatMode: val })
+		},
+		currentTrack(newTrack) {
+			if (newTrack) {
+				this.$nextTick(() => {
+					this.setupMediaSessionActionHandlers()
+					this.updateMediaSessionMetadata()
+				})
+			} else {
+				this.clearMediaSession()
+			}
+		},
+		currentTrackCover() {
+			if (this.currentTrack) {
+				this.updateMediaSessionMetadata()
+			}
 		}
 	},
 	mounted() {
@@ -1445,35 +1469,53 @@ export default {
 			if (typeof navigator === 'undefined' || !('mediaSession' in navigator)) return
 
 			const actions = [
-				['play', () => {
-					const audio = this.$refs.audioPlayer
-					if (audio) audio.play().catch(e => console.warn('Play error:', e))
-				}],
-				['pause', () => {
-					const audio = this.$refs.audioPlayer
-					if (audio) audio.pause()
-				}],
-				['previoustrack', () => {
-					this.playPreviousTrack()
-				}],
-				['nexttrack', () => {
-					this.playNextTrack()
-				}],
-				['seekto', (details) => {
-					if (details && typeof details.seekTime === 'number' && !isNaN(details.seekTime)) {
+				[
+					'play',
+					() => {
 						const audio = this.$refs.audioPlayer
-						if (audio) {
-							const maxDur = (audio.duration && !isNaN(audio.duration)) ? audio.duration : details.seekTime
-							const targetTime = Math.max(0, Math.min(details.seekTime, maxDur))
-							audio.currentTime = targetTime
-							this.audioCurrentTime = targetTime
-							this.updateMediaSessionPositionState()
+						if (audio) audio.play().catch(e => console.warn('Play error:', e))
+					}
+				],
+				[
+					'pause',
+					() => {
+						const audio = this.$refs.audioPlayer
+						if (audio) audio.pause()
+					}
+				],
+				[
+					'previoustrack',
+					() => {
+						this.playPreviousTrack()
+					}
+				],
+				[
+					'nexttrack',
+					() => {
+						this.playNextTrack()
+					}
+				],
+				[
+					'seekto',
+					details => {
+						if (details && typeof details.seekTime === 'number' && !isNaN(details.seekTime)) {
+							const audio = this.$refs.audioPlayer
+							if (audio) {
+								const maxDur = audio.duration && !isNaN(audio.duration) ? audio.duration : details.seekTime
+								const targetTime = Math.max(0, Math.min(details.seekTime, maxDur))
+								audio.currentTime = targetTime
+								this.audioCurrentTime = targetTime
+								this.updateMediaSessionPositionState()
+							}
 						}
 					}
-				}],
-				['stop', () => {
-					this.closePlayer()
-				}]
+				],
+				[
+					'stop',
+					() => {
+						this.closePlayer()
+					}
+				]
 			]
 
 			actions.forEach(([action, handler]) => {
@@ -1485,7 +1527,12 @@ export default {
 			})
 		},
 		updateMediaSessionMetadata() {
-			if (typeof navigator === 'undefined' || !('mediaSession' in navigator) || typeof window.MediaMetadata === 'undefined') return
+			if (
+				typeof navigator === 'undefined' ||
+				!('mediaSession' in navigator) ||
+				typeof window.MediaMetadata === 'undefined'
+			)
+				return
 			if (!this.currentTrack) {
 				try {
 					navigator.mediaSession.metadata = null
@@ -1535,18 +1582,23 @@ export default {
 			} catch (e) {}
 		},
 		updateMediaSessionPositionState() {
-			if (typeof navigator === 'undefined' || !('mediaSession' in navigator) || typeof navigator.mediaSession.setPositionState !== 'function') return
+			if (
+				typeof navigator === 'undefined' ||
+				!('mediaSession' in navigator) ||
+				typeof navigator.mediaSession.setPositionState !== 'function'
+			)
+				return
 			const audio = this.$refs.audioPlayer
 			if (!audio) return
 			const duration = audio.duration
 			if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) {
 				const position = Math.min(Math.max(0, audio.currentTime || 0), duration)
-				const playbackRate = (Number.isFinite(audio.playbackRate) && audio.playbackRate > 0) ? audio.playbackRate : 1.0
+				const playbackRate = Number.isFinite(audio.playbackRate) && audio.playbackRate > 0 ? audio.playbackRate : 1.0
 				try {
 					navigator.mediaSession.setPositionState({
-						duration: duration,
-						playbackRate: playbackRate,
-						position: position
+						duration,
+						playbackRate,
+						position
 					})
 				} catch (e) {
 					// Audio might be transitioning or unready
@@ -1595,9 +1647,7 @@ export default {
 			;(data.artists || []).forEach(artist => {
 				if (Array.isArray(artist.albums)) {
 					artist.albums.forEach(album => {
-						const tracksTitleStr = Array.isArray(album.tracks)
-							? album.tracks.map(t => t.title || '').join(' ')
-							: ''
+						const tracksTitleStr = Array.isArray(album.tracks) ? album.tracks.map(t => t.title || '').join(' ') : ''
 						album._searchIndex = `${album.title || ''} ${album.artist || ''} ${tracksTitleStr}`.toLowerCase()
 						albums.push(album)
 						if (Array.isArray(album.tracks)) {
@@ -1618,7 +1668,9 @@ export default {
 			// Refresh selectedAlbum reference if modal is open
 			if (this.selectedAlbum) {
 				const found = this.allAlbums.find(
-					a => a.path === this.selectedAlbum.path || (a.title === this.selectedAlbum.title && a.artist === this.selectedAlbum.artist)
+					a =>
+						a.path === this.selectedAlbum.path ||
+						(a.title === this.selectedAlbum.title && a.artist === this.selectedAlbum.artist)
 				)
 				if (found && found.tracks && found.tracks.length > 0) {
 					this.selectedAlbum = found
@@ -1722,7 +1774,11 @@ export default {
 			if (!isoString) return ''
 			try {
 				const d = new Date(isoString)
-				return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+				return (
+					d.toLocaleDateString([], { month: 'short', day: 'numeric' }) +
+					' ' +
+					d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+				)
 			} catch {
 				return isoString
 			}
@@ -1871,8 +1927,12 @@ export default {
 }
 
 @keyframes spin {
-	from { transform: rotate(0deg); }
-	to { transform: rotate(360deg); }
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 /* Stats Cards as Buttons */
@@ -1972,10 +2032,18 @@ export default {
 	letter-spacing: -0.02em;
 }
 
-.text-primary-val { color: var(--primary-color); }
-.text-cyan-val { color: #06b6d4; }
-.text-emerald-val { color: #10b981; }
-.text-amber-val { color: #f59e0b; }
+.text-primary-val {
+	color: var(--primary-color);
+}
+.text-cyan-val {
+	color: #06b6d4;
+}
+.text-emerald-val {
+	color: #10b981;
+}
+.text-amber-val {
+	color: #f59e0b;
+}
 
 /* Unified Media Toolbar */
 .media-toolbar {
@@ -2870,8 +2938,12 @@ export default {
 }
 
 @media (max-width: 640px) {
-	.col-artist { display: none; }
-	.track-artist-mobile { display: block; }
+	.col-artist {
+		display: none;
+	}
+	.track-artist-mobile {
+		display: block;
+	}
 }
 
 .track-artist-cell {
@@ -3222,8 +3294,13 @@ export default {
 }
 
 @keyframes eqBounce {
-	0%, 100% { height: 25%; }
-	50% { height: 100%; }
+	0%,
+	100% {
+		height: 25%;
+	}
+	50% {
+		height: 100%;
+	}
 }
 
 /* Floating Audio Player Bar */

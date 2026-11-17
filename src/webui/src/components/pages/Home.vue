@@ -7,9 +7,7 @@
 					<i class="material-icons title-icon">home</i>
 					{{ $t('globals.welcome') }}
 				</h1>
-				<p class="page-subtitle">
-					Discover trending releases, featured albums, and popular playlists
-				</p>
+				<p class="page-subtitle">Discover trending releases, featured albums, and popular playlists</p>
 			</div>
 		</div>
 
@@ -21,10 +19,13 @@
 				</div>
 				<div class="login-info">
 					<h3 class="login-title">{{ $t('home.needTologin') }}</h3>
-					<p class="login-desc">Configure your Deezer account or ARL token in Settings to enable lossless downloads and your personal library.</p>
+					<p class="login-desc">
+						Configure your Deezer account or ARL token in Settings to enable lossless downloads and your personal
+						library.
+					</p>
 				</div>
 			</div>
-			<router-link custom v-slot="{ navigate }" :to="{ name: 'Settings' }">
+			<router-link v-slot="{ navigate }" custom :to="{ name: 'Settings' }">
 				<button class="btn btn-primary login-btn" @click="navigate" @keypress.enter="navigate">
 					<i class="material-icons btn-icon">settings</i>
 					<span>{{ $t('home.openSettings') }}</span>
@@ -46,20 +47,15 @@
 				<router-link
 					v-for="release in playlists"
 					:key="release.id"
-					custom
 					v-slot="{ navigate }"
+					custom
 					:to="{ name: 'Playlist', params: { id: release.id } }"
 					tabindex="0"
 					@keyup.enter.native="$router.push({ name: 'Playlist', params: { id: release.id } })"
 				>
-					<div class="media-card" @click="navigate" @keypress.enter="navigate" role="link">
+					<div class="media-card" role="link" @click="navigate" @keypress.enter="navigate">
 						<div class="media-cover-wrapper">
-							<img
-								:src="release.picture_medium"
-								:alt="release.title"
-								class="media-cover-img"
-								loading="lazy"
-							/>
+							<img :src="release.picture_medium" :alt="release.title" class="media-cover-img" loading="lazy" />
 							<div class="media-overlay">
 								<button
 									type="button"
@@ -99,21 +95,16 @@
 				<router-link
 					v-for="release in albums"
 					:key="release.id"
-					custom
 					v-slot="{ navigate }"
+					custom
 					:to="{ name: 'Album', params: { id: release.id } }"
 					:data-id="release.id"
 					tabindex="0"
 					@keyup.enter.native="$router.push({ name: 'Album', params: { id: release.id } })"
 				>
-					<div class="media-card" @click="navigate" @keypress.enter="navigate" role="link">
+					<div class="media-card" role="link" @click="navigate" @keypress.enter="navigate">
 						<div class="media-cover-wrapper">
-							<img
-								:src="release.cover_medium"
-								:alt="release.title"
-								class="media-cover-img"
-								loading="lazy"
-							/>
+							<img :src="release.cover_medium" :alt="release.title" class="media-cover-img" loading="lazy" />
 							<div class="media-overlay">
 								<button
 									type="button"
@@ -172,10 +163,7 @@ export default {
 		},
 		initHome(data) {
 			if (!data) return
-			const {
-				playlists: { data: playlistData = [] } = {},
-				albums: { data: albumData = [] } = {}
-			} = data
+			const { playlists: { data: playlistData = [] } = {}, albums: { data: albumData = [] } = {} } = data
 
 			this.playlists = playlistData
 			this.albums = albumData

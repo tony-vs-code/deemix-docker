@@ -20,12 +20,7 @@
 			/>
 
 			<!-- Clear Button -->
-			<button
-				v-if="inputValue"
-				class="clear-btn"
-				title="Clear search"
-				@click="clearSearch"
-			>
+			<button v-if="inputValue" class="clear-btn" title="Clear search" @click="clearSearch">
 				<i class="material-icons text-base">close</i>
 			</button>
 
@@ -54,8 +49,6 @@ import { mapGetters } from 'vuex'
 import { defineComponent, ref } from '@vue/composition-api'
 import { isValidURL } from '@/utils/utils'
 import { sendAddToQueue } from '@/utils/downloads'
-import { fetchData } from '@/utils/api'
-import EventBus from '@/utils/EventBus'
 
 export default defineComponent({
 	name: 'TheSearchBar',
@@ -73,7 +66,10 @@ export default defineComponent({
 	created() {
 		const focusSearchBar = keyEvent => {
 			// Ctrl+F or Ctrl+K or Cmd+K
-			if ((keyEvent.keyCode === 70 && keyEvent.ctrlKey) || (keyEvent.keyCode === 75 && (keyEvent.ctrlKey || keyEvent.metaKey))) {
+			if (
+				(keyEvent.keyCode === 70 && keyEvent.ctrlKey) ||
+				(keyEvent.keyCode === 75 && (keyEvent.ctrlKey || keyEvent.metaKey))
+			) {
 				keyEvent.preventDefault()
 				this.$refs.searchbar.focus()
 			}

@@ -140,7 +140,7 @@ const pt_br = {
 			wrongLicense: 'A sua conta não permite reproduzir a faixa na qualidade desejada.',
 			wrongGeolocation: 'A sua conta não permite reproduzir a faixa a partir do país atual.',
 			wrongGeolocationNoAlternative:
-				"A sua conta não permite reproduzir a faixa a partir do país atual e nenhuma alternativa foi encontrada."
+				'A sua conta não permite reproduzir a faixa a partir do país atual e nenhuma alternativa foi encontrada.'
 		}
 	},
 	favorites: {
@@ -220,7 +220,8 @@ const pt_br = {
 		loginNeededToDownload: 'Você precisa fazer login para baixar faixas!',
 		queueErrorCantStream: `Sua conta não pode reproduzir a {bitrate}!`,
 		deezerNotAvailable: 'Deezer não disponível no seu país. Você precisa usar uma VPN.',
-		deezerNotReachable: "O aplicativo não consegue conectar-se ao Deezer. Verifique sua conexão com a Internet, firewall ou antivírus.",
+		deezerNotReachable:
+			'O aplicativo não consegue conectar-se ao Deezer. Verifique sua conexão com a Internet, firewall ou antivírus.',
 		startGeneratingItems: 'Processando {n} itens...',
 		finishGeneratingItems: '{n} itens gerados.',
 		noLovedPlaylist: 'Nenhuma playlist de músicas curtidas!',

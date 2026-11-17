@@ -12,12 +12,7 @@
 				<div class="hero-backdrop" :style="heroBackdropStyle"></div>
 				<div class="hero-content">
 					<div class="artist-avatar-wrapper">
-						<img
-							v-if="artistPicture"
-							:src="artistPicture"
-							:alt="artistName"
-							class="artist-avatar"
-						/>
+						<img v-if="artistPicture" :src="artistPicture" :alt="artistName" class="artist-avatar" />
 						<div v-else class="artist-avatar-fallback">
 							<i class="material-icons avatar-fallback-icon">person</i>
 						</div>
@@ -99,12 +94,8 @@
 						<tr v-for="release in sortedData" :key="release.releaseID" class="release-row">
 							<!-- Cover Art + Title -->
 							<td class="td-release">
-								<router-link
-									custom
-									v-slot="{ navigate }"
-									:to="{ name: 'Album', params: { id: release.releaseID } }"
-								>
-									<div class="release-info-wrapper" @click="navigate" @keypress.enter="navigate" role="link">
+								<router-link v-slot="{ navigate }" custom :to="{ name: 'Album', params: { id: release.releaseID } }">
+									<div class="release-info-wrapper" role="link" @click="navigate" @keypress.enter="navigate">
 										<div class="release-cover-wrapper">
 											<img
 												:src="release.releaseCover"
@@ -118,19 +109,10 @@
 												<span class="release-title-text" :title="release.releaseTitle">
 													{{ release.releaseTitle }}
 												</span>
-												<i
-													v-if="release.isReleaseExplicit"
-													class="material-icons explicit-icon"
-													title="Explicit"
-												>
+												<i v-if="release.isReleaseExplicit" class="material-icons explicit-icon" title="Explicit">
 													explicit
 												</i>
-												<span
-													v-if="checkNewRelease(release.releaseDate)"
-													class="new-release-tag"
-												>
-													NEW
-												</span>
+												<span v-if="checkNewRelease(release.releaseDate)" class="new-release-tag"> NEW </span>
 											</div>
 											<span v-if="currentTab === 'all' && release.releaseType" class="release-type-badge">
 												{{ $tc(`globals.listTabs.${release.releaseType}`, 1) }}
@@ -322,8 +304,12 @@ export default defineComponent({
 }
 
 @keyframes spin {
-	from { transform: rotate(0deg); }
-	to { transform: rotate(360deg); }
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 .loading-text {

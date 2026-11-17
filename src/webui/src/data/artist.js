@@ -13,7 +13,7 @@ function formatArtistReleases(artistReleases) {
 	const formattedReleases = {}
 
 	for (const releaseType in artistReleases) {
-		if (artistReleases.hasOwnProperty(releaseType)) {
+		if (Object.prototype.hasOwnProperty.call(artistReleases, releaseType)) {
 			const releases = artistReleases[releaseType]
 			formattedReleases[releaseType] = []
 

@@ -19,9 +19,7 @@
 
 			<!-- Status & Error Indicator -->
 			<div class="download-info-status">
-				<span class="status-counter-pill">
-					{{ queueItem.downloaded + queueItem.failed }}/{{ queueItem.size }}
-				</span>
+				<span class="status-counter-pill"> {{ queueItem.downloaded + queueItem.failed }}/{{ queueItem.size }} </span>
 
 				<button
 					v-if="hasFails"
@@ -446,15 +444,33 @@ export default {
 }
 
 @keyframes indeterminate {
-	0% { left: -35%; right: 100%; }
-	60% { left: 100%; right: -90%; }
-	100% { left: 100%; right: -90%; }
+	0% {
+		left: -35%;
+		right: 100%;
+	}
+	60% {
+		left: 100%;
+		right: -90%;
+	}
+	100% {
+		left: 100%;
+		right: -90%;
+	}
 }
 
 @keyframes indeterminate-short {
-	0% { left: -200%; right: 100%; }
-	60% { left: 107%; right: -8%; }
-	100% { left: 107%; right: -8%; }
+	0% {
+		left: -200%;
+		right: 100%;
+	}
+	60% {
+		left: 107%;
+		right: -8%;
+	}
+	100% {
+		left: 107%;
+		right: -8%;
+	}
 }
 
 /* Action Icon */
@@ -513,8 +529,12 @@ export default {
 }
 
 @keyframes spin {
-	from { transform: rotate(0deg); }
-	to { transform: rotate(360deg); }
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 /* Slim Mode Support */

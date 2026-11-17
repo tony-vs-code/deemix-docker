@@ -1,12 +1,12 @@
 <template>
 	<div class="flex flex-col items-center justify-center">
 		<router-link
-			custom
 			v-slot="{ navigate }"
+			custom
 			class="cursor-pointer"
 			:to="{ name: upperCaseFirstLowerCaseRest($attrs.info.type), params: { id: $attrs.info.id } }"
 		>
-			<div @click="navigate" @keypress.enter="navigate" role="link">
+			<div role="link" @click="navigate" @keypress.enter="navigate">
 				<CoverContainer
 					class="w-40 h-40"
 					:is-rounded="$attrs.info.type !== 'artist'"
@@ -32,8 +32,8 @@
 </template>
 
 <script>
-import { upperCaseFirstLowerCaseRest } from '@/utils/texts'
 import CoverContainer from '@components/globals/CoverContainer.vue'
+import { upperCaseFirstLowerCaseRest } from '@/utils/texts'
 
 export default {
 	components: {

@@ -1,11 +1,5 @@
 <template>
-	<aside
-		id="sidebar"
-		:class="{ 'slim-sidebar': isSlim }"
-		aria-label="sidebar"
-		class="sidebar-nav"
-		role="navigation"
-	>
+	<aside id="sidebar" :class="{ 'slim-sidebar': isSlim }" aria-label="sidebar" class="sidebar-nav" role="navigation">
 		<!-- Brand Header -->
 		<div class="brand-header">
 			<div class="deemix-icon-container" v-html="deemixIcon" />
@@ -31,10 +25,7 @@
 						{{ link.icon }}
 					</i>
 					<!-- Downloading pulse badge on icon if slim -->
-					<span
-						v-if="isSlim && link.name === 'downloads' && downloadingCount > 0"
-						class="slim-download-dot"
-					></span>
+					<span v-if="isSlim && link.name === 'downloads' && downloadingCount > 0" class="slim-download-dot"></span>
 				</div>
 
 				<span v-if="!isSlim" class="nav-label">
@@ -459,7 +450,8 @@ export default defineComponent({
 }
 
 @keyframes pulse {
-	0%, 100% {
+	0%,
+	100% {
 		opacity: 1;
 		transform: scale(1);
 	}

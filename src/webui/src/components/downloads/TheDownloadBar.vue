@@ -9,12 +9,7 @@
 		@transitionend="$refs.container.style.transition = ''"
 	>
 		<!-- Drag handler -->
-		<div
-			v-show="isExpanded"
-			class="drag-handle"
-			title="Drag to resize"
-			@mousedown.prevent="startDrag"
-		>
+		<div v-show="isExpanded" class="drag-handle" title="Drag to resize" @mousedown.prevent="startDrag">
 			<div class="drag-handle-bar"></div>
 		</div>
 
@@ -45,12 +40,7 @@
 				>
 					<i class="material-icons">folder_open</i>
 				</button>
-				<button
-					type="button"
-					class="bar-icon-btn"
-					:title="$t('globals.clean_queue_hint')"
-					@click="cleanQueue"
-				>
+				<button type="button" class="bar-icon-btn" :title="$t('globals.clean_queue_hint')" @click="cleanQueue">
 					<i class="material-icons">clear_all</i>
 				</button>
 				<button
@@ -66,11 +56,7 @@
 
 		<!-- Bar Toggler when Collapsed -->
 		<div v-show="!isExpanded" class="collapsed-tab-wrapper" @click.prevent="toggleDownloadTab">
-			<button
-				type="button"
-				class="collapsed-toggle-btn"
-				:title="$t('globals.toggle_download_tab_hint')"
-			>
+			<button type="button" class="collapsed-toggle-btn" :title="$t('globals.toggle_download_tab_hint')">
 				<i class="material-icons">chevron_left</i>
 			</button>
 			<div class="collapsed-label-box">
@@ -80,13 +66,7 @@
 		</div>
 
 		<!-- Download Items List -->
-		<div
-			v-show="isExpanded"
-			id="download_list"
-			ref="list"
-			class="download-list-scroll pr-2"
-			:class="{ slim: isSlim }"
-		>
+		<div v-show="isExpanded" id="download_list" ref="list" class="download-list-scroll pr-2" :class="{ slim: isSlim }">
 			<QueueItem
 				v-for="item in queueList"
 				:key="item.uuid"
@@ -222,12 +202,7 @@ export default {
 		},
 		initQueue(data) {
 			if (!data) return
-			const {
-				queueOrder: initQueue = [],
-				current: currentItem,
-				queue: initQueueList = {},
-				restored
-			} = data
+			const { queueOrder: initQueue = [], current: currentItem, queue: initQueueList = {}, restored } = data
 
 			const initQueueComplete = Object.values(initQueueList)
 				.filter(el => ['completed', 'withErrors', 'failed'].includes(el.status))
@@ -242,9 +217,12 @@ export default {
 				})
 			}
 
-			const activeItems = Array.isArray(data.currentItems) && data.currentItems.length > 0
-				? data.currentItems
-				: (currentItem ? [currentItem] : [])
+			const activeItems =
+				Array.isArray(data.currentItems) && data.currentItems.length > 0
+					? data.currentItems
+					: currentItem
+					? [currentItem]
+					: []
 
 			activeItems.forEach(item => {
 				if (item) {
@@ -308,7 +286,8 @@ export default {
 				}
 			}
 
-			const needToStartDownload = !itemIsAlreadyDownloaded && ((queueItem.progress > 0 && queueItem.progress < 100) || current)
+			const needToStartDownload =
+				!itemIsAlreadyDownloaded && ((queueItem.progress > 0 && queueItem.progress < 100) || current)
 
 			if (needToStartDownload) {
 				this.startDownload(queueItem.uuid)
@@ -386,8 +365,11 @@ export default {
 			this.queueComplete = []
 		},
 		removedFailedDownloads() {
-			const failed = Object.values(this.queueList).filter(el =>
-				['failed', 'withErrors'].includes(el.status) || (el.errors && el.errors.length > 0) || (el.failed && el.failed > 0)
+			const failed = Object.values(this.queueList).filter(
+				el =>
+					['failed', 'withErrors'].includes(el.status) ||
+					(el.errors && el.errors.length > 0) ||
+					(el.failed && el.failed > 0)
 			)
 			failed.forEach(item => {
 				const qIdx = this.queue.indexOf(item.uuid)

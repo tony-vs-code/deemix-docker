@@ -10,8 +10,13 @@
 
 			<div v-else class="release-grid">
 				<div v-for="release in viewInfo.data.slice(0, itemsToShow)" :key="release.albumID" class="w-40 release">
-					<router-link custom v-slot="{ navigate }" class="cursor-pointer" :to="{ name: 'Album', params: { id: release.albumID } }">
-						<div @click="navigate" @keypress.enter="navigate" role="link">
+					<router-link
+						v-slot="{ navigate }"
+						custom
+						class="cursor-pointer"
+						:to="{ name: 'Album', params: { id: release.albumID } }"
+					>
+						<div role="link" @click="navigate" @keypress.enter="navigate">
 							<CoverContainer
 								is-rounded
 								:cover="release.albumCoverMedium"

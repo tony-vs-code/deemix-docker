@@ -8,9 +8,7 @@
 					{{ $t('charts.title') }}
 				</h1>
 				<div class="header-meta-row">
-					<p v-if="!country" class="page-subtitle">
-						Select a country or region to view top Deezer charts
-					</p>
+					<p v-if="!country" class="page-subtitle">Select a country or region to view top Deezer charts</p>
 					<div v-else class="country-badge">
 						<i class="material-icons country-badge-icon">place</i>
 						<span class="country-badge-label">{{ country }}</span>
@@ -51,12 +49,7 @@
 					@keyup.enter="selectCountry(release)"
 				>
 					<div class="country-img-wrapper">
-						<img
-							:src="release.picture_medium"
-							:alt="release.title"
-							class="country-img"
-							loading="lazy"
-						/>
+						<img :src="release.picture_medium" :alt="release.title" class="country-img" loading="lazy" />
 						<div class="country-overlay">
 							<span class="country-name-badge">{{ release.title }}</span>
 						</div>
@@ -101,17 +94,9 @@
 
 							<!-- Cover Art + Preview -->
 							<td class="td-cover">
-								<div
-									:data-preview="track.preview"
-									class="preview-box"
-									@click="playPausePreview"
-								>
+								<div :data-preview="track.preview" class="preview-box" @click="playPausePreview">
 									<PreviewControls v-if="track.preview" />
-									<img
-										:src="track.album ? track.album.cover_small : ''"
-										class="track-cover-img"
-										alt="Cover"
-									/>
+									<img :src="track.album ? track.album.cover_small : ''" class="track-cover-img" alt="Cover" />
 								</div>
 							</td>
 
@@ -435,8 +420,12 @@ export default {
 }
 
 @keyframes spin {
-	from { transform: rotate(0deg); }
-	to { transform: rotate(360deg); }
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 .loading-text {

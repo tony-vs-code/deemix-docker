@@ -34,7 +34,7 @@ String.prototype.capitalize = function () {
 	return this.charAt(0).toUpperCase() + this.slice(1)
 }
 // Reset if ejs fails
-if (location.base == "<%= locationBase %>") location.base = "/"
+if (location.base === '<%= locationBase %>') location.base = '/'
 
 /* ===== App initialization ===== */
 async function startApp() {
@@ -255,7 +255,7 @@ const bitrateLabels = {
 	0: 'MP3'
 }
 socket.on('queueErrorCantStream', function (bitrate) {
-	toast(i18n.t('toasts.queueErrorCantStream', {bitrate: bitrateLabels[bitrate]}), 'report')
+	toast(i18n.t('toasts.queueErrorCantStream', { bitrate: bitrateLabels[bitrate] }), 'report')
 })
 
 socket.on('startGeneratingItems', function (data) {
