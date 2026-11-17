@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.32] - 2026-11-17
+
+### Added
+- Plex Library Backend & Streaming Proxies: added `fetchPlexLibrary()`, `deletePlexItem()`, `GET /api/plex/library`, token-safe artwork proxy `GET /api/plex/thumb`, HTTP 206 Range audio streaming proxy `GET /api/plex/stream`, and `POST /api/plex/delete` with strict path validation.
+- Plex-Powered Library & Player UI: updated `Library.vue` to automatically browse, search, paginate, stream audio, load artwork, trigger scans, and delete items from Plex when enabled, with a **Plex / Local** source switcher and graceful fallback to local `/downloads`.
+
 ## [2026.11.31] - 2026-11-17
 
 ### Added

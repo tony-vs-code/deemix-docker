@@ -20,6 +20,7 @@ import plexSettings from './plexSettings'
 import plexTest from './plexTest'
 import plexScan from './plexScan'
 import plexAuthPin from './plexAuthPin'
+import plexDelete from './plexDelete'
 
 export default [
 	changeAccount,
@@ -43,5 +44,6 @@ export default [
 	plexSettings,
 	plexTest,
 	plexScan,
-	plexAuthPin
+	plexAuthPin,
+	plexDelete
 ]

@@ -1,6 +1,8 @@
 import crypto from 'crypto'
 import fs from 'fs'
 import path from 'path'
+import { Readable } from 'stream'
+import type { Request, Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 // @ts-expect-error
 import deemix from 'deemix'
@@ -12,7 +14,12 @@ import {
 	PlexPinResult,
 	PlexPinStatus,
 	PlexServerConnection,
-	PlexServerResource
+	PlexServerResource,
+	PlexTrack,
+	PlexAlbum,
+	PlexArtist,
+	PlexLibraryResult,
+	PlexDeleteResult
 } from '../types'
 import { logger } from './logger'
 
@@ -32,6 +39,7 @@ const DEFAULT_PLEX_SETTINGS: PlexSettings = {
 }
 
 let cachedSettings: PlexSettings | null = null
+let cachedPlexLibrary: PlexLibraryResult | null = null
 let debounceTimer: NodeJS.Timeout | null = null
 
 /**
@@ -208,6 +216,7 @@ export function savePlexSettings(partial: Partial<PlexSettings>): PlexSettings {
 	try {
 		atomicWriteJson(plexConfigFile, updated)
 		cachedSettings = { ...updated }
+		cachedPlexLibrary = null
 		logger.info('Plex settings successfully updated and saved to plex.json')
 	} catch (err: any) {
 		logger.error(`Failed to save Plex settings to ${plexConfigFile}: ${err?.message || err}`)
@@ -342,6 +351,8 @@ export async function triggerPlexScan(overrideSettings?: Partial<PlexSettings>):
 		logger.warn(`Plex scan aborted: ${msg}`)
 		return { success: false, message: msg, error: msg }
 	}
+
+	cachedPlexLibrary = null
 
 	const fetchFn: typeof fetch = (globalThis as any).fetch || fetch
 	const headers: Record<string, string> = {
@@ -660,5 +671,642 @@ export async function fetchPlexServers(token?: string): Promise<PlexServerResour
 		const message = formatPlexTvError(err, 'Failed to fetch Plex servers from plex.tv')
 		logger.warn(`Plex server discovery failed: ${message}`)
 		throw new Error(message)
+	}
+}
+
+/**
+ * Formats byte counts into human-readable file size strings.
+ */
+function formatBytes(bytes: number, decimals = 2): string {
+	if (!bytes || bytes <= 0) return '0 B'
+	const k = 1024
+	const dm = decimals < 0 ? 0 : decimals
+	const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+	const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1)
+	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
+}
+
+/**
+ * Clears the in-memory Plex library cache.
+ */
+export function clearPlexLibraryCache(): void {
+	cachedPlexLibrary = null
+}
+
+/**
+ * Executes a JSON GET request against the configured Plex Media Server with timeout handling.
+ */
+async function fetchPlexServerJson(url: string, token: string, timeoutMs = 15000): Promise<any> {
+	const controller = new AbortController()
+	const timeout = setTimeout(() => controller.abort(), timeoutMs)
+	const fetchFn: typeof fetch = (globalThis as any).fetch || fetch
+
+	try {
+		const response = await fetchFn(url, {
+			method: 'GET',
+			headers: {
+				Accept: 'application/json',
+				'X-Plex-Token': token
+			},
+			signal: controller.signal
+		})
+
+		if (!response.ok) {
+			const errorMsg =
+				response.status === 401
+					? 'Unauthorized: Invalid or missing X-Plex-Token'
+					: `Plex server returned HTTP ${response.status} (${response.statusText})`
+			throw new Error(errorMsg)
+		}
+
+		return await response.json()
+	} catch (err: any) {
+		const isTimeout = err?.name === 'AbortError' || err?.code === 'ABORT_ERR'
+		if (isTimeout) {
+			throw new Error(`Plex library request timed out after ${Math.round(timeoutMs / 1000)} seconds`)
+		}
+		throw err
+	} finally {
+		clearTimeout(timeout)
+	}
+}
+
+/**
+ * Fetches and normalizes all music tracks from Plex into artists -> albums -> tracks.
+ * Caches results in memory until invalidated by settings save, scan, delete, or forceRefresh.
+ */
+export async function fetchPlexLibrary(forceRefresh = false): Promise<PlexLibraryResult> {
+	const settings = getPlexSettings()
+	const url = normalizeUrl(settings.serverUrl)
+	const token = settings.token ? settings.token.trim() : ''
+
+	if (!settings.enabled || !url || !token) {
+		cachedPlexLibrary = null
+		return {
+			source: 'plex',
+			enabled: false,
+			configured: Boolean(url && token),
+			artists: [],
+			totalArtists: 0,
+			totalAlbums: 0,
+			totalTracks: 0,
+			totalSize: 0,
+			formattedTotalSize: '0 B',
+			lastScanned: null
+		}
+	}
+
+	if (!forceRefresh && cachedPlexLibrary) {
+		return cachedPlexLibrary
+	}
+
+	try {
+		new URL(url)
+	} catch {
+		return {
+			source: 'plex',
+			enabled: true,
+			configured: true,
+			serverUrl: url,
+			artists: [],
+			totalArtists: 0,
+			totalAlbums: 0,
+			totalTracks: 0,
+			totalSize: 0,
+			formattedTotalSize: '0 B',
+			lastScanned: null,
+			error: 'Invalid Plex Server URL format'
+		}
+	}
+
+	try {
+		const configuredSection = settings.sectionId ? settings.sectionId.trim() : ''
+		let targetSectionIds: string[] = []
+
+		if (configuredSection && configuredSection.toLowerCase() !== 'all') {
+			targetSectionIds = [configuredSection]
+		} else {
+			const sectionsData = await fetchPlexServerJson(`${url}/library/sections`, token, 15000)
+			const rawDirs = sectionsData?.MediaContainer?.Directory
+			const dirs: any[] = Array.isArray(rawDirs) ? rawDirs : rawDirs ? [rawDirs] : []
+			targetSectionIds = dirs
+				.filter((d: any) => String(d?.type || '').toLowerCase() === 'artist')
+				.map((d: any) => String(d.key || d.id || '').trim())
+				.filter(Boolean)
+		}
+
+		if (targetSectionIds.length === 0) {
+			const emptyResult: PlexLibraryResult = {
+				source: 'plex',
+				enabled: true,
+				configured: true,
+				serverUrl: url,
+				artists: [],
+				totalArtists: 0,
+				totalAlbums: 0,
+				totalTracks: 0,
+				totalSize: 0,
+				formattedTotalSize: '0 B',
+				lastScanned: new Date().toISOString()
+			}
+			cachedPlexLibrary = emptyResult
+			return emptyResult
+		}
+
+		const rawTracks: any[] = []
+		for (const secId of targetSectionIds) {
+			const tracksData = await fetchPlexServerJson(
+				`${url}/library/sections/${encodeURIComponent(secId)}/all?type=10`,
+				token,
+				15000
+			)
+			const rawMetadata = tracksData?.MediaContainer?.Metadata
+			const items: any[] = Array.isArray(rawMetadata) ? rawMetadata : rawMetadata ? [rawMetadata] : []
+			for (const item of items) {
+				rawTracks.push(item)
+			}
+		}
+
+		const artistsMap = new Map<
+			string,
+			{
+				name: string
+				ratingKey: string
+				albumsMap: Map<
+					string,
+					{
+						id: string
+						ratingKey: string
+						title: string
+						artist: string
+						cover: string
+						plexThumb: string
+						year?: number
+						tracks: PlexTrack[]
+					}
+				>
+			}
+		>()
+
+		const seenTrackKeys = new Set<string>()
+		let totalTracks = 0
+		let totalSize = 0
+
+		for (const item of rawTracks) {
+			if (!item) continue
+			const ratingKey = item.ratingKey != null ? String(item.ratingKey).trim() : ''
+			if (ratingKey && seenTrackKeys.has(ratingKey)) continue
+			if (ratingKey) seenTrackKeys.add(ratingKey)
+
+			const parentRatingKey = item.parentRatingKey != null ? String(item.parentRatingKey).trim() : ''
+			const grandparentRatingKey = item.grandparentRatingKey != null ? String(item.grandparentRatingKey).trim() : ''
+
+			const albumArtist = String(item.grandparentTitle || item.originalTitle || 'Unknown Artist').trim() || 'Unknown Artist'
+			const trackArtist = String(item.originalTitle || item.grandparentTitle || 'Unknown Artist').trim() || 'Unknown Artist'
+			const albumTitle = String(item.parentTitle || 'Unknown Album').trim() || 'Unknown Album'
+			const title = String(item.title || 'Unknown Track').trim() || 'Unknown Track'
+			const trackNumber = Number(item.index) || 0
+			const discNumber = Number(item.parentIndex) || 1
+			const rawYear = item.parentYear ?? item.year
+			const year = rawYear !== undefined && rawYear !== null && !isNaN(Number(rawYear)) ? Number(rawYear) : undefined
+
+			const rawMedia = Array.isArray(item.Media) ? item.Media[0] : item.Media
+			const rawPart = rawMedia ? (Array.isArray(rawMedia.Part) ? rawMedia.Part[0] : rawMedia.Part) : undefined
+			const partKey = rawPart?.key ? String(rawPart.key).trim() : ''
+			const size = Number(rawPart?.size) || 0
+			const durationMs = Number(item.duration ?? rawMedia?.duration ?? rawPart?.duration ?? 0)
+			const duration = durationMs > 0 ? Math.round(durationMs / 1000) : 0
+			const rawCodec = rawMedia?.audioCodec || rawMedia?.container || rawPart?.container || 'MP3'
+			const format = String(rawCodec).trim().toUpperCase() || 'MP3'
+			const bitrate =
+				rawMedia?.bitrate !== undefined && rawMedia?.bitrate !== null && !isNaN(Number(rawMedia.bitrate))
+					? Number(rawMedia.bitrate)
+					: undefined
+
+			const thumb = item.thumb ? String(item.thumb).trim() : item.parentThumb ? String(item.parentThumb).trim() : ''
+			const albumCover = item.parentThumb ? String(item.parentThumb).trim() : thumb
+
+			const track: PlexTrack = {
+				id: ratingKey || partKey || `${albumArtist}-${albumTitle}-${title}-${trackNumber}`,
+				ratingKey,
+				title,
+				artist: trackArtist,
+				album: albumTitle,
+				albumTitle,
+				albumArtist,
+				albumRatingKey: parentRatingKey,
+				trackNumber,
+				discNumber,
+				duration,
+				size,
+				formattedSize: formatBytes(size),
+				format,
+				...(bitrate !== undefined ? { bitrate } : {}),
+				path: partKey,
+				partKey,
+				thumb,
+				plexThumb: thumb,
+				source: 'plex'
+			}
+
+			const artistKey = grandparentRatingKey || albumArtist.toLowerCase()
+			const albumKey = parentRatingKey || albumTitle.toLowerCase()
+
+			let artistGroup = artistsMap.get(artistKey)
+			if (!artistGroup) {
+				artistGroup = {
+					name: albumArtist,
+					ratingKey: grandparentRatingKey,
+					albumsMap: new Map()
+				}
+				artistsMap.set(artistKey, artistGroup)
+			}
+
+			let albumGroup = artistGroup.albumsMap.get(albumKey)
+			if (!albumGroup) {
+				albumGroup = {
+					id: parentRatingKey || `${artistKey}-${albumKey}`,
+					ratingKey: parentRatingKey,
+					title: albumTitle,
+					artist: albumArtist,
+					cover: albumCover,
+					plexThumb: albumCover,
+					...(year !== undefined ? { year } : {}),
+					tracks: []
+				}
+				artistGroup.albumsMap.set(albumKey, albumGroup)
+			} else {
+				if (!albumGroup.cover && albumCover) {
+					albumGroup.cover = albumCover
+					albumGroup.plexThumb = albumCover
+				}
+				if (albumGroup.year === undefined && year !== undefined) {
+					albumGroup.year = year
+				}
+			}
+
+			albumGroup.tracks.push(track)
+			totalTracks++
+			totalSize += size
+		}
+
+		let totalAlbums = 0
+		const artists: PlexArtist[] = []
+
+		for (const artistGroup of artistsMap.values()) {
+			const albums: PlexAlbum[] = []
+
+			for (const albumGroup of artistGroup.albumsMap.values()) {
+				albumGroup.tracks.sort(
+					(a, b) =>
+						(a.discNumber || 1) - (b.discNumber || 1) ||
+						(a.trackNumber || 0) - (b.trackNumber || 0) ||
+						a.title.localeCompare(b.title)
+				)
+				const albumSize = albumGroup.tracks.reduce((sum, t) => sum + (t.size || 0), 0)
+				albums.push({
+					id: albumGroup.id,
+					ratingKey: albumGroup.ratingKey,
+					title: albumGroup.title,
+					artist: albumGroup.artist,
+					cover: albumGroup.cover,
+					plexThumb: albumGroup.plexThumb,
+					...(albumGroup.year !== undefined ? { year: albumGroup.year } : {}),
+					tracks: albumGroup.tracks,
+					totalSize: albumSize,
+					formattedTotalSize: formatBytes(albumSize),
+					trackCount: albumGroup.tracks.length,
+					tracksCount: albumGroup.tracks.length,
+					source: 'plex'
+				})
+				totalAlbums++
+			}
+
+			albums.sort((a, b) => a.title.localeCompare(b.title))
+			const artistTrackCount = albums.reduce((sum, a) => sum + a.trackCount, 0)
+			const artistSize = albums.reduce((sum, a) => sum + a.totalSize, 0)
+
+			artists.push({
+				name: artistGroup.name,
+				ratingKey: artistGroup.ratingKey,
+				albums,
+				albumCount: albums.length,
+				albumsCount: albums.length,
+				trackCount: artistTrackCount,
+				totalTracks: artistTrackCount,
+				totalSize: artistSize,
+				source: 'plex'
+			})
+		}
+
+		artists.sort((a, b) => a.name.localeCompare(b.name))
+
+		const result: PlexLibraryResult = {
+			source: 'plex',
+			enabled: true,
+			configured: true,
+			serverUrl: url,
+			artists,
+			totalArtists: artists.length,
+			totalAlbums,
+			totalTracks,
+			totalSize,
+			formattedTotalSize: formatBytes(totalSize),
+			lastScanned: new Date().toISOString()
+		}
+
+		cachedPlexLibrary = result
+		logger.info(`Loaded Plex library: ${artists.length} artist(s), ${totalAlbums} album(s), ${totalTracks} track(s)`)
+		return result
+	} catch (err: any) {
+		const message = err?.message || 'Failed to fetch Plex library'
+		logger.warn(`Failed to fetch Plex library: ${message}`)
+		return {
+			source: 'plex',
+			enabled: true,
+			configured: true,
+			serverUrl: url,
+			artists: [],
+			totalArtists: 0,
+			totalAlbums: 0,
+			totalTracks: 0,
+			totalSize: 0,
+			formattedTotalSize: '0 B',
+			lastScanned: null,
+			error: message
+		}
+	}
+}
+
+/**
+ * Deletes an album or track metadata item from Plex Media Server by ratingKey
+ * and invalidates the cached Plex library.
+ */
+export async function deletePlexItem(ratingKey: string): Promise<PlexDeleteResult> {
+	const cleanKey = String(ratingKey ?? '').trim()
+	if (!cleanKey) {
+		return { success: false, error: 'Missing ratingKey parameter' }
+	}
+
+	const settings = getPlexSettings()
+	const url = normalizeUrl(settings.serverUrl)
+	const token = settings.token ? settings.token.trim() : ''
+
+	if (!settings.enabled || !url || !token) {
+		return { success: false, error: 'Plex integration is not enabled or configured' }
+	}
+
+	const controller = new AbortController()
+	const timeout = setTimeout(() => controller.abort(), 10000)
+	const fetchFn: typeof fetch = (globalThis as any).fetch || fetch
+
+	try {
+		const targetUrl = `${url}/library/metadata/${encodeURIComponent(cleanKey)}`
+		logger.info(`Deleting Plex library item ${cleanKey} via ${targetUrl}`)
+		const response = await fetchFn(targetUrl, {
+			method: 'DELETE',
+			headers: {
+				Accept: 'application/json',
+				'X-Plex-Token': token
+			},
+			signal: controller.signal
+		})
+
+		clearTimeout(timeout)
+
+		if (!response.ok) {
+			let errorMsg = `Plex server returned HTTP ${response.status} (${response.statusText})`
+			if (response.status === 401) {
+				errorMsg = 'Unauthorized: Invalid X-Plex-Token'
+			} else if (response.status === 403 || response.status === 405) {
+				errorMsg = 'Plex rejected deletion. Ensure "Allow media deletion" is enabled in Plex Server settings.'
+			} else if (response.status === 404) {
+				errorMsg = 'Media item was not found on Plex server'
+			}
+			logger.warn(`Plex delete failed for ratingKey ${cleanKey}: ${errorMsg}`)
+			return { success: false, error: errorMsg }
+		}
+
+		cachedPlexLibrary = null
+		logger.info(`Deleted Plex library item ${cleanKey}`)
+		return { success: true }
+	} catch (err: any) {
+		clearTimeout(timeout)
+		const isTimeout = err?.name === 'AbortError' || err?.code === 'ABORT_ERR'
+		const message = isTimeout ? 'Plex delete request timed out after 10 seconds' : err?.message || String(err)
+		logger.error(`Plex delete error for ratingKey ${cleanKey}: ${message}`)
+		return { success: false, error: message }
+	}
+}
+
+/**
+ * Validates a relative Plex media/thumb path against SSRF, protocol injection, and path traversal.
+ */
+export function validatePlexPath(
+	rawPath: unknown,
+	requiredPrefix = '/'
+): { valid: true; path: string; targetUrl: string; token: string } | { valid: false; status: number; error: string } {
+	if (typeof rawPath !== 'string' || rawPath.trim().length === 0) {
+		return { valid: false, status: 400, error: 'Missing path parameter' }
+	}
+
+	const cleanPath = rawPath.trim()
+	let decodedPath = cleanPath
+	try {
+		decodedPath = decodeURIComponent(cleanPath)
+	} catch {
+		return { valid: false, status: 400, error: 'Invalid path encoding' }
+	}
+
+	if (cleanPath.includes('\0') || decodedPath.includes('\0') || cleanPath.includes('\\') || decodedPath.includes('\\')) {
+		return { valid: false, status: 400, error: 'Invalid path parameter' }
+	}
+
+	if (
+		cleanPath.startsWith('//') ||
+		decodedPath.startsWith('//') ||
+		/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(cleanPath) ||
+		/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(decodedPath)
+	) {
+		return { valid: false, status: 403, error: 'Forbidden: Protocol prefixes or full URLs are not allowed' }
+	}
+
+	if (cleanPath.includes('..') || decodedPath.includes('..')) {
+		return { valid: false, status: 403, error: 'Forbidden: Path traversal detected' }
+	}
+
+	if (!cleanPath.startsWith(requiredPrefix)) {
+		return { valid: false, status: 400, error: `Invalid path: must start with ${requiredPrefix}` }
+	}
+
+	const settings = getPlexSettings()
+	const serverUrl = normalizeUrl(settings.serverUrl)
+	const token = settings.token ? settings.token.trim() : ''
+
+	if (!settings.enabled || !serverUrl || !token) {
+		return { valid: false, status: 503, error: 'Plex integration is not enabled or configured' }
+	}
+
+	try {
+		const baseUrl = new URL(serverUrl)
+		const resolved = new URL(cleanPath, baseUrl)
+		if (resolved.origin !== baseUrl.origin) {
+			return { valid: false, status: 403, error: 'Forbidden: Target origin mismatch' }
+		}
+		return {
+			valid: true,
+			path: cleanPath,
+			targetUrl: `${serverUrl}${cleanPath}`,
+			token
+		}
+	} catch {
+		return { valid: false, status: 503, error: 'Invalid Plex server URL configuration' }
+	}
+}
+
+/**
+ * Proxies a Plex media or artwork response to an Express response using Node Readable.fromWeb,
+ * forwarding Range/status headers and aborting cleanly on client disconnect.
+ */
+export async function pipePlexResponse(
+	targetUrl: string,
+	token: string,
+	req: Request<any, any, any, any>,
+	res: Response<any>,
+	options: {
+		timeoutMs?: number
+		forwardRange?: boolean
+		cacheControl?: string
+		fallbackContentType?: string
+	} = {}
+): Promise<void> {
+	const timeoutMs = options.timeoutMs ?? 15000
+	const controller = new AbortController()
+	let connectTimer: NodeJS.Timeout | null = setTimeout(() => controller.abort(), timeoutMs)
+	let clientClosed = false
+	let nodeStream: Readable | null = null
+
+	const onResClose = () => {
+		if (!res.writableFinished) {
+			clientClosed = true
+			if (nodeStream && !nodeStream.destroyed) {
+				nodeStream.destroy()
+			}
+			controller.abort()
+		}
+	}
+
+	res.once('close', onResClose)
+
+	const upstreamHeaders: Record<string, string> = {
+		'X-Plex-Token': token
+	}
+	if (options.forwardRange && typeof req.headers.range === 'string' && req.headers.range.trim()) {
+		upstreamHeaders.Range = req.headers.range
+	}
+
+	const fetchFn: typeof fetch = (globalThis as any).fetch || fetch
+
+	try {
+		const response = await fetchFn(targetUrl, {
+			method: 'GET',
+			headers: upstreamHeaders,
+			signal: controller.signal
+		})
+
+		if (connectTimer) {
+			clearTimeout(connectTimer)
+			connectTimer = null
+		}
+
+		if (clientClosed) {
+			try {
+				await response.body?.cancel?.()
+			} catch {}
+			return
+		}
+
+		if (!response.ok) {
+			res.removeListener('close', onResClose)
+			if (response.status === 416 && options.forwardRange) {
+				const contentRange = response.headers.get('content-range')
+				if (contentRange) res.setHeader('Content-Range', contentRange)
+				res.status(416).send({ error: 'Requested range not satisfiable' })
+				return
+			}
+			res.status(response.status).send({ error: `Plex server returned HTTP ${response.status}` })
+			return
+		}
+
+		const upstreamType = response.headers.get('content-type')
+		const contentType =
+			upstreamType && (upstreamType !== 'application/octet-stream' || !options.fallbackContentType)
+				? upstreamType
+				: options.fallbackContentType || 'application/octet-stream'
+		res.setHeader('Content-Type', contentType)
+
+		const contentLength = response.headers.get('content-length')
+		if (contentLength) {
+			res.setHeader('Content-Length', contentLength)
+		}
+
+		if (options.cacheControl) {
+			res.setHeader('Cache-Control', options.cacheControl)
+		}
+
+		if (options.forwardRange) {
+			res.setHeader('Accept-Ranges', response.headers.get('accept-ranges') || 'bytes')
+			const contentRange = response.headers.get('content-range')
+			if (contentRange) {
+				res.setHeader('Content-Range', contentRange)
+			}
+		}
+
+		res.status(response.status)
+
+		if (response.body && typeof (Readable as any).fromWeb === 'function') {
+			nodeStream = (Readable as any).fromWeb(response.body) as Readable
+			nodeStream.on('error', (streamErr: any) => {
+				res.removeListener('close', onResClose)
+				const isAbort =
+					clientClosed ||
+					streamErr?.name === 'AbortError' ||
+					streamErr?.code === 'ABORT_ERR' ||
+					streamErr?.code === 'ERR_STREAM_PREMATURE_CLOSE'
+				if (!isAbort) {
+					logger.warn(`Plex proxy stream error: ${streamErr?.message || streamErr}`)
+				}
+				if (!res.headersSent) {
+					res.status(502).send({ error: 'Error streaming media from Plex' })
+				} else if (!res.writableEnded) {
+					res.end()
+				}
+			})
+			res.once('finish', () => {
+				res.removeListener('close', onResClose)
+			})
+			nodeStream.pipe(res)
+		} else {
+			const buf = Buffer.from(await response.arrayBuffer())
+			res.removeListener('close', onResClose)
+			res.send(buf)
+		}
+	} catch (err: any) {
+		if (connectTimer) {
+			clearTimeout(connectTimer)
+			connectTimer = null
+		}
+		res.removeListener('close', onResClose)
+		if (clientClosed) {
+			return
+		}
+		const isTimeout = err?.name === 'AbortError' || err?.code === 'ABORT_ERR'
+		const message = isTimeout ? 'Plex upstream request timed out' : err?.message || String(err)
+		logger.warn(`Plex proxy request failed: ${message}`)
+		if (!res.headersSent) {
+			res.status(isTimeout ? 504 : 502).send({ error: message })
+		} else if (!res.writableEnded) {
+			res.end()
+		}
 	}
 }

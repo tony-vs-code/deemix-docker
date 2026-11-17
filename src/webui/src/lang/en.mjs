@@ -705,6 +705,10 @@ const en = {
 	libraryPage: {
 		title: 'Library Manager',
 		downloadPath: 'Download Folder',
+		plexSourceLabel: 'Plex Server',
+		sourceLabel: 'Library Source',
+		sourcePlex: 'Plex',
+		sourceLocal: 'Local',
 		scanLibrary: 'Scan Library',
 		rescanLibrary: 'Rescan Library',
 		lastScanned: 'Last Updated',
@@ -717,11 +721,25 @@ const en = {
 		confirmDeleteTrackTitle: 'Delete Track From Disk',
 		confirmDeleteTrackMessage:
 			'Are you sure you want to permanently delete "{title}" from your hard drive? This cannot be undone.',
+		confirmDeletePlexAlbumTitle: 'Delete Album From Plex',
+		confirmDeletePlexAlbumMessage:
+			'Are you sure you want to delete "{title}" from your Plex Media Server? If media deletion is enabled in Plex, its files will also be permanently removed.',
+		confirmDeletePlexTrackTitle: 'Delete Track From Plex',
+		confirmDeletePlexTrackMessage:
+			'Are you sure you want to delete "{title}" from your Plex Media Server? If media deletion is enabled in Plex, the file will also be permanently removed.',
 		deletePermanently: 'Permanently Delete',
 		cancel: 'Cancel',
 		scanning: 'Scanning...',
 		scanningLibrary: 'Scanning music library...',
 		scanningDescription: 'Reading audio files and metadata from your download directory.',
+		loadingPlexLibrary: 'Loading Plex library...',
+		loadingPlexDescription: 'Fetching artists, albums, and tracks from your Plex Media Server.',
+		plexErrorTitle: 'Unable to Load Plex Library',
+		retryPlex: 'Retry Plex',
+		switchToLocal: 'Switch to Local',
+		plexScanTriggered: 'Plex library scan triggered and refreshed!',
+		plexDeleteSuccess: 'Deleted item from Plex library',
+		plexDeleteFailed: 'Failed to delete item from Plex library',
 		searchPlaceholder: 'Search by artist or album title...',
 		showingAlbums: 'Showing {count} of {total} albums',
 		tracks: 'tracks',
@@ -744,6 +762,8 @@ const en = {
 			emptyTitle: 'Music Library Is Empty',
 			emptyMessage:
 				'No audio files found in your configured download directory. Check your path in Settings or download some music.',
+			plexEmptyMessage:
+				'No audio tracks found in your configured Plex library section. Try scanning your Plex library or check your Plex section settings.',
 			noSearchTitle: 'No Matching Albums',
 			noSearchMessage: 'No artists or albums match your search query.'
 		},
