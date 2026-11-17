@@ -8,9 +8,7 @@
 					Search
 				</h1>
 				<div class="header-meta-row">
-					<p v-if="isQueryEmpty" class="page-subtitle">
-						Search Deezer artists, albums, tracks, and playlists
-					</p>
+					<p v-if="isQueryEmpty" class="page-subtitle">Search Deezer artists, albums, tracks, and playlists</p>
 					<div v-else class="query-badge">
 						<span class="query-label">Results for:</span>
 						<span class="query-term">"{{ results.query }}"</span>
@@ -269,7 +267,7 @@ export default defineComponent({
 			const tabsLoaded = []
 
 			for (const resultKey in this.results) {
-				if (this.results.hasOwnProperty(resultKey) && resultKey !== 'query') {
+				if (Object.prototype.hasOwnProperty.call(this.results, resultKey) && resultKey !== 'query') {
 					const currentResult = this.results[resultKey]
 
 					if (currentResult.hasLoaded) {
@@ -530,8 +528,12 @@ export default defineComponent({
 }
 
 @keyframes spin {
-	from { transform: rotate(0deg); }
-	to { transform: rotate(360deg); }
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 .search-loading-text {

@@ -28,8 +28,8 @@
 </template>
 
 <script>
-import { debounce } from '@/utils/utils'
 import BackButton from '@components/globals/BackButton.vue'
+import { debounce } from '@/utils/utils'
 
 export default {
 	components: {

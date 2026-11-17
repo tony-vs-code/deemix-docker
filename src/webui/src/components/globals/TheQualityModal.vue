@@ -97,7 +97,6 @@ export default {
 	}
 }
 
-
 .smallmodal-content button {
 	width: 100%;
 	margin-bottom: 8px;

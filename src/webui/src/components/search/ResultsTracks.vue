@@ -43,12 +43,12 @@
 						</td>
 
 						<router-link
-							custom
 							v-slot="{ navigate }"
+							custom
 							class="break-words table__cell table__cell--medium table__cell--center"
 							:to="{ name: 'Artist', params: { id: track.artistID } }"
 						>
-							<td @click="navigate" @keypress.enter="navigate" role="link">
+							<td role="link" @click="navigate" @keypress.enter="navigate">
 								<span class="cursor-pointer hover:underline">
 									{{ track.artistName }}
 								</span>
@@ -56,12 +56,12 @@
 						</router-link>
 
 						<router-link
-							custom
 							v-slot="{ navigate }"
+							custom
 							class="break-words table__cell table__cell--medium table__cell--center"
 							:to="{ name: 'Album', params: { id: track.albumID } }"
 						>
-							<td @click="navigate" @keypress.enter="navigate" role="link">
+							<td role="link" @click="navigate" @keypress.enter="navigate">
 								<span class="cursor-pointer hover:underline">
 									{{ track.albumTitle }}
 								</span>

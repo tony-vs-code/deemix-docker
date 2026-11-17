@@ -25,8 +25,6 @@
 </template>
 
 <script>
-import { socket } from '@/utils/socket'
-
 import BaseLoadingPlaceholder from '@components/globals/BaseLoadingPlaceholder.vue'
 import TheContextMenu from '@components/globals/TheContextMenu.vue'
 import TheTrackPreview from '@components/globals/TheTrackPreview.vue'
@@ -36,6 +34,7 @@ import DeezerWarning from '@components/globals/DeezerWarning.vue'
 import TheSidebar from '@components/TheSidebar.vue'
 import TheSearchBar from '@components/TheSearchBar.vue'
 import TheContent from '@components/TheContent.vue'
+import { socket } from '@/utils/socket'
 
 export default {
 	components: {
@@ -52,7 +51,7 @@ export default {
 	data() {
 		return {
 			isSocketConnected: false,
-			loadingText: "Connecting to local server..."
+			loadingText: 'Connecting to local server...'
 		}
 	},
 	mounted() {
@@ -61,7 +60,7 @@ export default {
 			console.log('Connected to WebSocket')
 			this.isSocketConnected = true
 		})
-		socket.addEventListener('error', (event) => {
+		socket.addEventListener('error', event => {
 			console.log(event)
 			this.loadingText = "Couldn't connect to local server."
 		})

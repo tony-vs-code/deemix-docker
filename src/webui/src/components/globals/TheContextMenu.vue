@@ -144,7 +144,7 @@ export default {
 			// Searching for the first element with a data-link attribute
 			// let deezerLink = this.searchForDataLink(...)
 			for (let i = 0; i < path.length; i++) {
-				if (path[i] == document) break
+				if (path[i] === document) break
 
 				if (path[i].matches('[data-link]')) {
 					deezerLink = path[i].dataset.link
@@ -235,9 +235,10 @@ export default {
 		showDeezerOptions(isSearchbar, isLinkOnly) {
 			if (!isSearchbar) this.options.copyDeezerLink.show = true
 
-			if (!isLinkOnly) downloadQualities.forEach(quality => {
-				this.options[quality.objName].show = true
-			})
+			if (!isLinkOnly)
+				downloadQualities.forEach(quality => {
+					this.options[quality.objName].show = true
+				})
 		}
 	}
 }

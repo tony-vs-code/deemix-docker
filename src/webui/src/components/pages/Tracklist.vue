@@ -13,12 +13,7 @@
 				<div class="hero-content">
 					<!-- Large Cover Art -->
 					<div class="hero-cover-wrapper">
-						<img
-							v-if="image"
-							:src="image"
-							:alt="title"
-							class="hero-cover-img"
-						/>
+						<img v-if="image" :src="image" :alt="title" class="hero-cover-img" />
 						<div v-else class="hero-cover-fallback">
 							<i class="material-icons fallback-icon">album</i>
 						</div>
@@ -139,7 +134,7 @@
 
 								<!-- Track Position -->
 								<td class="td-pos text-center">
-									<span class="pos-num">{{ type === 'album' ? track.track_position : (index + 1) }}</span>
+									<span class="pos-num">{{ type === 'album' ? track.track_position : index + 1 }}</span>
 								</td>
 
 								<!-- Track Title -->
@@ -148,7 +143,10 @@
 										<i v-if="track.explicit_lyrics" class="material-icons explicit-icon" title="Explicit">explicit</i>
 										<span class="track-title-text" :title="track.title">
 											{{ track.title }}
-											<span v-if="track.title_version && !track.title.includes(track.title_version)" class="track-version">
+											<span
+												v-if="track.title_version && !track.title.includes(track.title_version)"
+												class="track-version"
+											>
 												({{ track.title_version }})
 											</span>
 										</span>
@@ -188,11 +186,7 @@
 
 								<!-- Select Checkbox -->
 								<td class="td-select text-center" @click.stop>
-									<input
-										v-model="track.selected"
-										type="checkbox"
-										class="track-select-checkbox"
-									/>
+									<input v-model="track.selected" type="checkbox" class="track-select-checkbox" />
 								</td>
 							</tr>
 
@@ -262,11 +256,7 @@
 							</td>
 
 							<td class="td-select text-center" @click.stop>
-								<input
-									v-model="track.selected"
-									type="checkbox"
-									class="track-select-checkbox"
-								/>
+								<input v-model="track.selected" type="checkbox" class="track-select-checkbox" />
 							</td>
 						</tr>
 					</tbody>
@@ -288,12 +278,7 @@
 					</button>
 				</div>
 				<div class="footer-right">
-					<button
-						type="button"
-						class="btn btn-primary footer-btn"
-						:data-link="link"
-						@click.stop="addToQueue"
-					>
+					<button type="button" class="btn btn-primary footer-btn" :data-link="link" @click.stop="addToQueue">
 						<i class="material-icons btn-icon">cloud_download</i>
 						<span>{{ `${$t('globals.download', { thing: $tc(`globals.listTabs.${type}`, 1) })}` }}</span>
 					</button>
@@ -305,9 +290,9 @@
 
 <script>
 import { isEmpty } from 'lodash-es'
+import { playPausePreview } from '@components/globals/TheTrackPreview.vue'
 import { sendAddToQueue } from '@/utils/downloads'
 import Utils from '@/utils/utils'
-import { playPausePreview } from '@components/globals/TheTrackPreview.vue'
 import EventBus from '@/utils/EventBus'
 
 export default {
@@ -429,7 +414,10 @@ export default {
 			this.title = albumTitle
 			this.explicit = explicit_lyrics
 			this.label = albumLabel
-			this.metadata = `${artistName || ''} • ${this.$tc('globals.listTabs.trackN', numberOfTracks || (albumTracks ? albumTracks.length : 0))}`
+			this.metadata = `${artistName || ''} • ${this.$tc(
+				'globals.listTabs.trackN',
+				numberOfTracks || (albumTracks ? albumTracks.length : 0)
+			)}`
 			this.release_date = release_date ? release_date.substring(0, 10) : ''
 			this.image = cover_xl
 
@@ -531,8 +519,12 @@ export default {
 }
 
 @keyframes spin {
-	from { transform: rotate(0deg); }
-	to { transform: rotate(360deg); }
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 .loading-text {

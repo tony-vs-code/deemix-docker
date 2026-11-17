@@ -147,13 +147,7 @@
 				<div class="card-main">
 					<!-- Cover Artwork with Bitrate Tag -->
 					<div class="cover-wrapper">
-						<img
-							v-if="item.cover"
-							:src="item.cover"
-							:alt="item.title"
-							class="cover-image"
-							loading="lazy"
-						/>
+						<img v-if="item.cover" :src="item.cover" :alt="item.title" class="cover-image" loading="lazy" />
 						<div v-else class="cover-placeholder">
 							<i class="material-icons text-3xl">music_note</i>
 						</div>
@@ -197,9 +191,7 @@
 										{{ item.downloaded + item.failed }} / {{ item.size }} {{ $t('downloadsPage.tracks') }}
 									</span>
 								</div>
-								<span class="progress-percent">
-									{{ Math.round(calculateProgress(item)) }}%
-								</span>
+								<span class="progress-percent"> {{ Math.round(calculateProgress(item)) }}% </span>
 							</div>
 
 							<!-- Vibrant Gradient Progress Bar -->
@@ -274,11 +266,7 @@
 			<p class="empty-description">
 				{{ emptyStateMessage }}
 			</p>
-			<router-link
-				v-if="activeFilter === 'all' && totalCount === 0"
-				to="/search"
-				class="btn btn-primary mt-6"
-			>
+			<router-link v-if="activeFilter === 'all' && totalCount === 0" to="/search" class="btn btn-primary mt-6">
 				<i class="material-icons mr-1.5 text-base">search</i>
 				{{ $t('sidebar.search') }}
 			</router-link>
@@ -473,9 +461,8 @@ export default {
 				})
 			}
 
-			const activeItems = Array.isArray(currentItems) && currentItems.length > 0
-				? currentItems
-				: (currentItem ? [currentItem] : [])
+			const activeItems =
+				Array.isArray(currentItems) && currentItems.length > 0 ? currentItems : currentItem ? [currentItem] : []
 
 			activeItems.forEach(item => {
 				if (item) {
@@ -515,13 +502,12 @@ export default {
 				if (!this.queueComplete.includes(queueItem.uuid)) {
 					this.queueComplete.push(queueItem.uuid)
 				}
-			} else {
-				if (!this.queue.includes(queueItem.uuid)) {
-					this.queue.push(queueItem.uuid)
-				}
+			} else if (!this.queue.includes(queueItem.uuid)) {
+				this.queue.push(queueItem.uuid)
 			}
 
-			const needToStartDownload = !itemIsAlreadyDownloaded && ((queueItem.progress > 0 && queueItem.progress < 100) || current)
+			const needToStartDownload =
+				!itemIsAlreadyDownloaded && ((queueItem.progress > 0 && queueItem.progress < 100) || current)
 			if (needToStartDownload) {
 				this.startDownload(queueItem.uuid)
 			}
@@ -686,13 +672,20 @@ export default {
 		},
 		bitrateLabel(bitrate) {
 			switch (parseInt(bitrate, 10)) {
-				case 9: return 'FLAC'
-				case 3: return '320'
-				case 1: return '128'
-				case 15: return '360HQ'
-				case 14: return '360MQ'
-				case 13: return '360LQ'
-				default: return 'MP3'
+				case 9:
+					return 'FLAC'
+				case 3:
+					return '320'
+				case 1:
+					return '128'
+				case 15:
+					return '360HQ'
+				case 14:
+					return '360MQ'
+				case 13:
+					return '360LQ'
+				default:
+					return 'MP3'
 			}
 		},
 		generateLink(item) {
@@ -804,17 +797,17 @@ export default {
 				event.dataTransfer.setData('text/plain', uuid)
 			}
 		},
-		onDragOver(event, targetUuid) {
+		onDragOver(_event, targetUuid) {
 			if (!this.draggedUuid || this.draggedUuid === targetUuid) return
 			if (!this.isQueued(this.queueList[targetUuid])) return
 			this.dragTargetUuid = targetUuid
 		},
-		onDragLeave(event, targetUuid) {
+		onDragLeave(_event, targetUuid) {
 			if (this.dragTargetUuid === targetUuid) {
 				this.dragTargetUuid = null
 			}
 		},
-		async onDrop(event, targetUuid) {
+		async onDrop(_event, targetUuid) {
 			const srcUuid = this.draggedUuid
 			this.draggedUuid = null
 			this.dragTargetUuid = null
@@ -1004,8 +997,12 @@ export default {
 }
 
 @keyframes spin {
-	from { transform: rotate(0deg); }
-	to { transform: rotate(360deg); }
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
 }
 
 /* Filter Tabs */
@@ -1455,11 +1452,11 @@ export default {
 }
 
 /* Drag and Drop States */
-.download-card[draggable="true"] {
+.download-card[draggable='true'] {
 	cursor: grab;
 }
 
-.download-card[draggable="true"]:active {
+.download-card[draggable='true']:active {
 	cursor: grabbing;
 }
 

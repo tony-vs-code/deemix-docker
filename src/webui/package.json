@@ -4,9 +4,9 @@
 	"scripts": {
 		"clean": "rimraf public/js/bundle.js public/js/bundle.temp.js public/js/bundle.js.map",
 		"clean-temp": "rimraf public/js/bundle.temp.js",
-		"build:js": "rollup -c",
-		"minify": "esbuild public/js/bundle.temp.js --outfile=public/js/bundle.js --minify",
-		"build": "npm-run-all --sequential clean build:js minify clean-temp",
+		"build:js": "BROWSERSLIST_IGNORE_OLD_DATA=1 rollup -c",
+		"minify": "esbuild public/js/bundle.temp.js --outfile=public/js/bundle.js --minify --target=es2020",
+		"build": "yarn clean && yarn build:js && yarn minify && yarn clean-temp",
 		"start:gui": "yarn --cwd ../ start",
 		"watch:server": "yarn --cwd ../server watch",
 		"watch:js": "rollup -c -w",

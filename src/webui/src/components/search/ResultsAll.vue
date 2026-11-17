@@ -60,14 +60,14 @@
 </template>
 
 <script>
-import { convertDuration } from '@/utils/utils'
-import { upperCaseFirstLowerCaseRest } from '@/utils/texts'
-import TopResult from '@/components/search/TopResult.vue'
 import ResultsTracks from '@components/search/ResultsTracks.vue'
 import ResultsAlbums from '@components/search/ResultsAlbums.vue'
 import ResultsArtists from '@components/search/ResultsArtists.vue'
 import ResultsPlaylists from '@components/search/ResultsPlaylists.vue'
 import ResultsError from '@components/search/ResultsError.vue'
+import TopResult from '@/components/search/TopResult.vue'
+import { upperCaseFirstLowerCaseRest } from '@/utils/texts'
+import { convertDuration } from '@/utils/utils'
 
 import { formatSingleTrack, formatAlbums, formatArtist, formatPlaylist } from '@/data/search'
 import { standardizeData } from '@/data/standardize'
