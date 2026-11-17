@@ -10,6 +10,7 @@ import { NotLoggedIn, CantStream } from './helpers/errors'
 import { GUI_PACKAGE } from './helpers/paths'
 import { logger } from './helpers/logger'
 import { scanLibrary } from './helpers/libraryDb'
+import { schedulePlexScan } from './helpers/plex'
 
 // Types
 const Downloader = deemix.downloader.Downloader
@@ -433,6 +434,9 @@ export class DeemixApp {
 						.catch(scanErr => {
 							logger.error(`Failed to auto-index completed download: ${scanErr}`)
 						})
+
+					// Debounce Plex library refresh across concurrent/batch downloads
+					schedulePlexScan()
 				}
 			}
 

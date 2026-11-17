@@ -16,6 +16,9 @@ import pauseQueue from './pauseQueue'
 import resumeQueue from './resumeQueue'
 import clearFailedDownloads from './clearFailedDownloads'
 import reorderQueue from './reorderQueue'
+import plexSettings from './plexSettings'
+import plexTest from './plexTest'
+import plexScan from './plexScan'
 
 export default [
 	changeAccount,
@@ -35,5 +38,8 @@ export default [
 	pauseQueue,
 	resumeQueue,
 	clearFailedDownloads,
-	reorderQueue
+	reorderQueue,
+	plexSettings,
+	plexTest,
+	plexScan
 ]

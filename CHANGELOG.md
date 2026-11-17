@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.28] - 2026-11-16
+
+### Added
+- Plex Library Integration: added `src/server/src/helpers/plex.ts` with atomic `/config/plex.json` persistence, `AbortController` 6s request timeouts, and a 3-second debounced post-download refresh hook (`schedulePlexScan()`) in `src/server/src/app.ts`.
+- Plex API Endpoints: added `GET /api/plex/settings`, `POST /api/plex/settings`, `POST /api/plex/test`, and `POST /api/plex/scan`.
+- Plex Settings Tab: added a dedicated **Plex** tab in `Settings.vue` with Server URL, `X-Plex-Token` show/hide toggle, **Test Connection & Load Libraries**, Music Library Section selector + manual ID fallback, auto-scan toggle, and **Scan Plex Now** trigger.
+
 ## [2026.11.27] - 2026-11-16
 
 ### Changed
