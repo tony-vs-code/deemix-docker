@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.31] - 2026-11-17
+
+### Added
+- Plex.tv OAuth PIN Authentication: added `POST /api/plex/auth/pin`, `GET /api/plex/auth/pin/:id`, and `GET /api/plex/servers` endpoints with persistent `clientIdentifier` UUID and `plex.tv/api/v2/resources` server discovery.
+- Plex Sign-In & Server Selector UI: added **"Sign in with Plex.tv"** popup flow (with clickable fallback link and 2s polling), automatic Plex server/connection selector that populates `serverUrl` and loads Music Library sections, **Disconnect** button, and expandable manual URL/token override in `Settings.vue`.
+
 ## [2026.11.30] - 2026-11-16
 
 ### Changed
