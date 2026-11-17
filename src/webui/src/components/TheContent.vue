@@ -11,7 +11,7 @@
 			<keep-alive>
 				<router-view
 					v-if="!$route.meta.notKeepAlive"
-					:key="$route.fullPath"
+					:key="routerViewKey"
 					:class="{ '-mt-16': showBackButton }"
 					:perform-scrolled-search="performScrolledSearch"
 				></router-view>
@@ -19,7 +19,7 @@
 
 			<router-view
 				v-if="$route.meta.notKeepAlive"
-				:key="$route.fullPath"
+				:key="routerViewKey"
 				:class="{ '-mt-16': showBackButton }"
 				:perform-scrolled-search="performScrolledSearch"
 			></router-view>
@@ -41,11 +41,19 @@ export default {
 	computed: {
 		showBackButton() {
 			return ['Tracklist', 'Artist', 'Album', 'Playlist', 'Spotify Playlist'].includes(this.$route.name)
+		},
+		routerViewKey() {
+			if (['Settings', 'Library', 'Downloads'].includes(this.$route.name)) {
+				return this.$route.path
+			}
+			return this.$route.fullPath
 		}
 	},
 	mounted() {
 		this.$router.beforeEach((_, __, next) => {
-			this.$refs.content.scrollTo(0, 0)
+			if (this.$refs.content) {
+				this.$refs.content.scrollTo(0, 0)
+			}
 			next()
 		})
 	},

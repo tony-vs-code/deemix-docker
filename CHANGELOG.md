@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.30] - 2026-11-16
+
+### Changed
+- Sidebar Submenus Navigation: moved **Settings**, **Library**, and **Downloads** section tabs into collapsible submenus directly in `TheSidebar.vue` (with slim-mode floating popover support) synced via route query parameters (`?tab=...`, `?filter=...`).
+- Keep-Alive Route Keying: updated `TheContent.vue` to key tabbed pages by `$route.path` so switching submenu sections preserves component state without remounting.
+- Cleaner Page Headers: removed redundant `.settings-tabs-bar` from `Settings.vue` and synced `Settings.vue`, `Library.vue`, and `Downloads.vue` with sidebar submenu navigation.
+
 ## [2026.11.29] - 2026-11-16
 
 ### Fixed

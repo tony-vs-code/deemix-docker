@@ -73,7 +73,7 @@
 			<button
 				class="stat-card"
 				:class="{ 'stat-card-active active-queue': activeFilter === 'queue' }"
-				@click="activeFilter = 'queue'"
+				@click="setFilter('queue')"
 			>
 				<div class="stat-header">
 					<span class="stat-label">{{ $t('downloadsPage.tabs.queue') }}</span>
@@ -85,7 +85,7 @@
 			<button
 				class="stat-card stat-downloading"
 				:class="{ 'stat-card-active active-downloading': activeFilter === 'downloading' }"
-				@click="activeFilter = 'downloading'"
+				@click="setFilter('downloading')"
 			>
 				<div class="stat-header">
 					<span class="stat-label text-cyan">{{ $t('downloadsPage.status.downloading') }}</span>
@@ -97,7 +97,7 @@
 			<button
 				class="stat-card stat-queued"
 				:class="{ 'stat-card-active active-queued': activeFilter === 'queued' }"
-				@click="activeFilter = 'queued'"
+				@click="setFilter('queued')"
 			>
 				<div class="stat-header">
 					<span class="stat-label text-amber">{{ $t('downloadsPage.status.queued') }}</span>
@@ -109,7 +109,7 @@
 			<button
 				class="stat-card stat-completed"
 				:class="{ 'stat-card-active active-completed': activeFilter === 'completed' }"
-				@click="activeFilter = 'completed'"
+				@click="setFilter('completed')"
 			>
 				<div class="stat-header">
 					<span class="stat-label text-emerald">{{ $t('downloadsPage.tabs.completed') }}</span>
@@ -121,7 +121,7 @@
 			<button
 				class="stat-card stat-failed"
 				:class="{ 'stat-card-active active-failed': activeFilter === 'failed' }"
-				@click="activeFilter = 'failed'"
+				@click="setFilter('failed')"
 			>
 				<div class="stat-header">
 					<span class="stat-label text-rose">{{ $t('downloadsPage.tabs.failed') }}</span>
@@ -266,7 +266,7 @@
 			<p class="empty-description">
 				{{ emptyStateMessage }}
 			</p>
-			<router-link v-if="activeFilter === 'all' && totalCount === 0" to="/search" class="btn btn-primary mt-6">
+			<router-link v-if="activeFilter === 'queue' && totalCount === 0" to="/search" class="btn btn-primary mt-6">
 				<i class="material-icons mr-1.5 text-base">search</i>
 				{{ $t('sidebar.search') }}
 			</router-link>
@@ -277,6 +277,9 @@
 <script>
 import { socket } from '@/utils/socket'
 import { fetchData, postToServer } from '@/utils/api'
+import { getSidebarLink, navigateToChildQuery, resolveLinkChildId, syncRouteQuery } from '@/data/sidebar'
+
+const downloadsLink = getSidebarLink('downloads')
 
 export default {
 	name: 'Downloads',
@@ -285,10 +288,31 @@ export default {
 			queue: [],
 			queueList: {},
 			queueComplete: [],
-			activeFilter: 'queue',
+			activeFilter: resolveLinkChildId(downloadsLink, this.$route ? this.$route.query : {}),
 			queuePaused: false,
 			draggedUuid: null,
 			dragTargetUuid: null
+		}
+	},
+	watch: {
+		'$route.query.filter': {
+			immediate: true,
+			handler(newFilter) {
+				if (this.$route.name !== 'Downloads') return
+				const resolved = resolveLinkChildId(downloadsLink, { filter: newFilter })
+				if (this.activeFilter !== resolved) {
+					this.activeFilter = resolved
+				}
+				if (newFilter && resolved !== newFilter) {
+					navigateToChildQuery(this, downloadsLink, resolved)
+				}
+			}
+		},
+		activeFilter(newFilter) {
+			const resolved = syncRouteQuery(this, downloadsLink, newFilter)
+			if (resolved !== newFilter) {
+				this.activeFilter = resolved
+			}
 		}
 	},
 	computed: {
@@ -428,6 +452,9 @@ export default {
 		socket.off('queueOrderUpdated', this.queueOrderUpdated)
 	},
 	methods: {
+		setFilter(filter) {
+			this.activeFilter = navigateToChildQuery(this, downloadsLink, filter)
+		},
 		async loadInitialQueue() {
 			try {
 				const res = await fetchData('getQueue')
@@ -1005,82 +1032,8 @@ export default {
 	}
 }
 
-/* Filter Tabs */
-.filter-tabs-bar {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	padding: 0.35rem;
-	background: var(--surface-glass);
-	backdrop-filter: blur(12px);
-	border: 1px solid var(--border-color);
-	border-radius: 0.875rem;
-	margin-bottom: 1.75rem;
-	overflow-x: auto;
-}
-
-.filter-pill {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.5rem;
-	padding: 0.5rem 1rem;
-	border-radius: 0.625rem;
-	font-size: 0.8125rem;
-	font-weight: 600;
-	color: var(--secondary-text);
-	background: transparent;
-	border: none;
-	cursor: pointer;
-	transition: all 0.2s ease;
-	white-space: nowrap;
-}
-
-.filter-pill:hover {
-	color: var(--foreground);
-	background-color: var(--border-color);
-}
-
-.filter-pill-active {
-	background: var(--card-background) !important;
-	color: var(--foreground) !important;
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-	border: 1px solid var(--border-color-hover);
-}
-
-.filter-badge {
-	padding: 0.1rem 0.45rem;
-	font-size: 0.7rem;
-	font-weight: 700;
-	border-radius: 9999px;
-}
-
-.badge-muted {
-	background: var(--border-color-hover);
-	color: var(--foreground);
-}
-
-.badge-cyan {
-	background: rgba(6, 182, 212, 0.2);
-	color: #06b6d4;
-}
-
-.badge-amber {
-	background: rgba(245, 158, 11, 0.2);
-	color: #f59e0b;
-}
-
 .text-amber {
 	color: #f59e0b;
-}
-
-.badge-emerald {
-	background: rgba(16, 185, 129, 0.2);
-	color: #10b981;
-}
-
-.badge-rose {
-	background: rgba(244, 63, 94, 0.2);
-	color: #f43f5e;
 }
 
 /* Download Cards List */
