@@ -3,12 +3,16 @@
 		<!-- Page Header -->
 		<div class="page-header">
 			<div class="header-titles">
+				<div class="page-breadcrumb">
+					<i class="material-icons breadcrumb-icon">settings</i>
+					<span>{{ $t('settings.title') }}</span>
+				</div>
 				<h1 class="page-title">
-					<i class="material-icons title-icon">tune</i>
-					{{ $t('settings.title') }}
+					<i class="material-icons title-icon">{{ activeSection.icon }}</i>
+					{{ activeSection.label }}
 				</h1>
 				<p class="page-subtitle">
-					Configure application preferences, download paths, audio quality, and metadata options
+					{{ activeSection.subtitle }}
 				</p>
 			</div>
 
@@ -23,20 +27,6 @@
 					<span>{{ $t('settings.save') }}</span>
 				</button>
 			</div>
-		</div>
-
-		<!-- Category Tab Navigation Bar (No Expanding Accordions) -->
-		<div class="settings-tabs-bar">
-			<button
-				v-for="tab in tabs"
-				:key="tab.id"
-				class="tab-btn"
-				:class="{ 'tab-btn--active': currentTab === tab.id }"
-				@click="currentTab = tab.id"
-			>
-				<i class="material-icons tab-icon">{{ tab.icon }}</i>
-				<span class="tab-label">{{ tab.label }}</span>
-			</button>
 		</div>
 
 		<!-- Category Views Content -->
@@ -566,8 +556,8 @@
 				</div>
 			</div>
 
-			<!-- TAB 4: FILE & FOLDER ORGANIZATION -->
-			<div v-show="currentTab === 'files'" class="tab-content-panel space-y-6">
+			<!-- TAB 4: FOLDERS & NAMING -->
+			<div v-show="currentTab === 'folders'" class="tab-content-panel space-y-6">
 				<!-- Naming Templates Card -->
 				<div class="settings-card">
 					<div class="card-header">
@@ -739,7 +729,7 @@
 			</div>
 
 			<!-- TAB 5: METADATA & TAGS -->
-			<div v-show="currentTab === 'tags'" class="tab-content-panel space-y-6">
+			<div v-show="currentTab === 'metadata'" class="tab-content-panel space-y-6">
 				<!-- Embedded Audio Tags Card -->
 				<div class="settings-card">
 					<div class="card-header">
@@ -1768,6 +1758,9 @@ import { copyToClipboard } from '@/utils/utils'
 
 import { fetchData, postToServer } from '@/utils/api'
 import { getFormItem } from '@/utils/forms'
+import { getChildSection, getSidebarLink, navigateToChildQuery, resolveLinkChildId, syncRouteQuery } from '@/data/sidebar'
+
+const settingsLink = getSidebarLink('settings')
 
 export default {
 	components: {
@@ -1775,17 +1768,7 @@ export default {
 	},
 	data() {
 		return {
-			currentTab: 'account',
-			tabs: [
-				{ id: 'account', label: 'Account', icon: 'person' },
-				{ id: 'general', label: 'General & Interface', icon: 'tune' },
-				{ id: 'downloads', label: 'Downloads & Quality', icon: 'cloud_download' },
-				{ id: 'files', label: 'File & Folder Organization', icon: 'create_new_folder' },
-				{ id: 'tags', label: 'Metadata & Tags', icon: 'bookmarks' },
-				{ id: 'artwork', label: 'Artwork & Covers', icon: 'image' },
-				{ id: 'plex', label: 'Plex', icon: 'cast_connected' },
-				{ id: 'logs', label: 'Application Logs', icon: 'receipt_long' }
-			],
+			currentTab: resolveLinkChildId(settingsLink, this.$route ? this.$route.query : {}),
 			logs: [],
 			logCounts: { all: 0, info: 0, warn: 0, error: 0, debug: 0 },
 			logFilterLevel: 'all',
@@ -1999,10 +1982,38 @@ export default {
 				return this.plexErrorMessage || 'Connection Failed'
 			}
 			return ''
+		},
+		activeSection() {
+			return (
+				getChildSection('settings', this.currentTab) || {
+					id: 'account',
+					label: 'Account',
+					icon: 'person',
+					subtitle: 'Configure application preferences, download paths, audio quality, and metadata options'
+				}
+			)
 		}
 	},
 	watch: {
+		'$route.query.tab': {
+			immediate: true,
+			handler(newTab) {
+				if (this.$route.name !== 'Settings') return
+				const resolved = resolveLinkChildId(settingsLink, { tab: newTab })
+				if (this.currentTab !== resolved) {
+					this.currentTab = resolved
+				}
+				if (newTab && resolved !== newTab) {
+					navigateToChildQuery(this, settingsLink, resolved)
+				}
+			}
+		},
 		currentTab(newTab) {
+			const resolved = syncRouteQuery(this, settingsLink, newTab)
+			if (resolved !== newTab) {
+				this.currentTab = resolved
+				return
+			}
 			if (newTab === 'account') {
 				this.fetchArlHealth()
 			}
@@ -2026,6 +2037,21 @@ export default {
 				this.stopAutoRefresh()
 			}
 		}
+	},
+	activated() {
+		const resolved = resolveLinkChildId(settingsLink, this.$route ? this.$route.query : {})
+		if (this.currentTab !== resolved) {
+			this.currentTab = resolved
+		} else if (this.currentTab === 'logs') {
+			this.fetchLogs()
+			this.fetchPermissions()
+		}
+		if (this.currentTab === 'logs' && this.logAutoRefresh) {
+			this.startAutoRefresh()
+		}
+	},
+	deactivated() {
+		this.stopAutoRefresh()
 	},
 	async mounted() {
 		const { settingsData, defaultSettingsData, spotifyCredentials } = await getSettingsData()
@@ -2569,6 +2595,21 @@ export default {
 	gap: 0.25rem;
 }
 
+.page-breadcrumb {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	font-size: 0.75rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--accent-cyan);
+}
+
+.breadcrumb-icon {
+	font-size: 0.95rem;
+}
+
 .page-title {
 	display: flex;
 	align-items: center;
@@ -2576,17 +2617,17 @@ export default {
 	font-size: 2rem;
 	font-weight: 700;
 	letter-spacing: -0.025em;
-	color: #f8fafc;
+	color: var(--foreground);
 	margin: 0;
 }
 
 .title-icon {
 	font-size: 2.25rem;
-	color: #06b6d4;
+	color: var(--accent-cyan);
 }
 
 .page-subtitle {
-	color: #94a3b8;
+	color: var(--secondary-text);
 	font-size: 0.95rem;
 	margin: 0;
 }
@@ -2610,85 +2651,6 @@ export default {
 
 .btn-icon {
 	font-size: 1.125rem;
-}
-
-/* Category Tab Navigation Bar */
-.settings-tabs-bar {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.45rem;
-	padding: 0.45rem;
-	background: rgba(15, 23, 42, 0.65);
-	backdrop-filter: blur(12px);
-	-webkit-backdrop-filter: blur(12px);
-	border: 1px solid rgba(255, 255, 255, 0.08);
-	border-radius: 0.875rem;
-	margin-bottom: 1.75rem;
-}
-
-.tab-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	gap: 0.5rem;
-	padding: 0.575rem 1rem;
-	font-size: 0.85rem;
-	font-weight: 500;
-	color: #94a3b8;
-	border-radius: 0.625rem;
-	background: transparent;
-	border: 1px solid transparent;
-	cursor: pointer;
-	white-space: nowrap;
-	flex: 1 1 auto;
-	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-	outline: none;
-}
-
-@media (max-width: 768px) {
-	.settings-tabs-bar {
-		display: grid;
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: 0.4rem;
-		padding: 0.4rem;
-	}
-
-	.tab-btn {
-		justify-content: flex-start;
-		padding: 0.55rem 0.75rem;
-		font-size: 0.8rem;
-		white-space: normal;
-		text-align: left;
-		line-height: 1.2;
-	}
-}
-
-@media (max-width: 420px) {
-	.settings-tabs-bar {
-		grid-template-columns: minmax(0, 1fr);
-	}
-}
-
-.tab-btn:hover {
-	color: #f1f5f9;
-	background: rgba(255, 255, 255, 0.05);
-}
-
-.tab-btn--active {
-	color: #ffffff !important;
-	background: rgba(6, 182, 212, 0.15) !important;
-	border-color: rgba(6, 182, 212, 0.4) !important;
-	font-weight: 600 !important;
-	box-shadow: 0 0 15px rgba(6, 182, 212, 0.2);
-}
-
-.tab-icon {
-	font-size: 1.15rem;
-	transition: color 0.2s ease;
-}
-
-.tab-btn--active .tab-icon {
-	color: #06b6d4;
 }
 
 /* Tab Content Panels */

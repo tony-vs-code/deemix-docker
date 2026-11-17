@@ -40,8 +40,8 @@
 		<div class="stats-grid">
 			<button
 				class="stat-card"
-				:class="{ 'stat-card-active active-albums': activeView === 'albums' }"
-				@click="activeView = 'albums'"
+				:class="{ 'stat-card-active active-albums': activeTab === 'albums' }"
+				@click="setActiveTab('albums')"
 			>
 				<div class="stat-header">
 					<span class="stat-label">{{ $t('libraryPage.stats.albums') }}</span>
@@ -52,8 +52,8 @@
 
 			<button
 				class="stat-card"
-				:class="{ 'stat-card-active active-artists': activeView === 'artists' }"
-				@click="activeView = 'artists'"
+				:class="{ 'stat-card-active active-artists': activeTab === 'artists' }"
+				@click="setActiveTab('artists')"
 			>
 				<div class="stat-header">
 					<span class="stat-label">{{ $t('libraryPage.stats.artists') }}</span>
@@ -64,8 +64,8 @@
 
 			<button
 				class="stat-card"
-				:class="{ 'stat-card-active active-tracks': activeView === 'tracks' }"
-				@click="activeView = 'tracks'"
+				:class="{ 'stat-card-active active-tracks': activeTab === 'tracks' }"
+				@click="setActiveTab('tracks')"
 			>
 				<div class="stat-header">
 					<span class="stat-label">{{ $t('libraryPage.stats.tracks') }}</span>
@@ -113,7 +113,7 @@
 				</div>
 
 				<!-- View Mode Switcher (Grid / List) for Albums -->
-				<div v-if="activeView === 'albums'" class="view-switcher">
+				<div v-if="activeTab === 'albums'" class="view-switcher">
 					<button
 						class="view-switch-btn"
 						:class="{ active: displayMode === 'grid' }"
@@ -134,13 +134,13 @@
 
 				<!-- Results Count Badge -->
 				<div class="results-count-pill">
-					<span v-if="activeView === 'albums'"
+					<span v-if="activeTab === 'albums'"
 						>{{ filteredAlbums.length }} {{ filteredAlbums.length === 1 ? 'Album' : 'Albums' }}</span
 					>
-					<span v-else-if="activeView === 'artists'"
+					<span v-else-if="activeTab === 'artists'"
 						>{{ filteredArtists.length }} {{ filteredArtists.length === 1 ? 'Artist' : 'Artists' }}</span
 					>
-					<span v-else-if="activeView === 'tracks'"
+					<span v-else-if="activeTab === 'tracks'"
 						>{{ filteredTracks.length }} {{ filteredTracks.length === 1 ? 'Track' : 'Tracks' }}</span
 					>
 				</div>
@@ -157,7 +157,7 @@
 		</div>
 
 		<!-- 1. ALBUMS VIEW -->
-		<template v-else-if="activeView === 'albums'">
+		<template v-else-if="activeTab === 'albums'">
 			<!-- Grid Display Mode -->
 			<div v-if="displayMode === 'grid' && filteredAlbums.length > 0" class="albums-grid">
 				<div
@@ -381,7 +381,7 @@
 		</template>
 
 		<!-- 2. ARTISTS VIEW -->
-		<template v-else-if="activeView === 'artists'">
+		<template v-else-if="activeTab === 'artists'">
 			<div v-if="filteredArtists.length > 0" class="artists-grid">
 				<div
 					v-for="(artist, index) in filteredArtists"
@@ -421,7 +421,7 @@
 		</template>
 
 		<!-- 3. ALL TRACKS VIEW -->
-		<template v-else-if="activeView === 'tracks'">
+		<template v-else-if="activeTab === 'tracks'">
 			<div v-if="filteredTracks.length > 0" class="tracks-view-container">
 				<div class="table-container">
 					<table class="tracks-table">
@@ -872,6 +872,9 @@
 <script>
 import { fetchData, postToServer } from '@/utils/api'
 import { socket } from '@/utils/socket'
+import { getSidebarLink, navigateToChildQuery, resolveLinkChildId, syncRouteQuery } from '@/data/sidebar'
+
+const libraryLink = getSidebarLink('library')
 
 function fastCompare(a, b) {
 	const s1 = (a || '').toLowerCase()
@@ -945,7 +948,7 @@ export default {
 	data() {
 		const storedSettings = loadStoredPlayerSettings()
 		return {
-			activeView: 'albums',
+			activeTab: resolveLinkChildId(libraryLink, this.$route ? this.$route.query : {}),
 			displayMode: 'grid',
 			sortBy: 'title_asc',
 			isScanning: false,
@@ -987,8 +990,8 @@ export default {
 			return 'volume_up'
 		},
 		searchPlaceholder() {
-			if (this.activeView === 'artists') return 'Search artists...'
-			if (this.activeView === 'tracks') return 'Search tracks, artists, or albums...'
+			if (this.activeTab === 'artists') return 'Search artists...'
+			if (this.activeTab === 'tracks') return 'Search tracks, artists, or albums...'
 			return 'Search albums by title, artist, or track name...'
 		},
 		totalAlbumPages() {
@@ -1087,7 +1090,7 @@ export default {
 			return this.cachedTracks
 		},
 		filteredTracks() {
-			if (this.activeView !== 'tracks') return []
+			if (this.activeTab !== 'tracks') return []
 			let tracks = this.cachedTracks
 			const q = (this.searchQuery || '').toLowerCase().trim()
 			if (q) {
@@ -1163,9 +1166,26 @@ export default {
 			this.albumCurrentPage = 1
 			this.trackCurrentPage = 1
 		},
-		activeView() {
+		'$route.query.tab': {
+			immediate: true,
+			handler(newTab) {
+				if (this.$route.name !== 'Library') return
+				const resolved = resolveLinkChildId(libraryLink, { tab: newTab })
+				if (this.activeTab !== resolved) {
+					this.activeTab = resolved
+				}
+				if (newTab && resolved !== newTab) {
+					navigateToChildQuery(this, libraryLink, resolved)
+				}
+			}
+		},
+		activeTab(newTab) {
 			this.albumCurrentPage = 1
 			this.trackCurrentPage = 1
+			const resolved = syncRouteQuery(this, libraryLink, newTab)
+			if (resolved !== newTab) {
+				this.activeTab = resolved
+			}
 		},
 		audioVolume(val) {
 			saveStoredPlayerSettings({ audioVolume: val })
@@ -1725,11 +1745,14 @@ export default {
 			this.searchInput = ''
 			this.searchQuery = ''
 		},
+		setActiveTab(tab) {
+			this.activeTab = navigateToChildQuery(this, libraryLink, tab)
+		},
 		selectArtist(artist) {
 			if (this.searchDebounceTimer) clearTimeout(this.searchDebounceTimer)
 			this.searchInput = artist.name
 			this.searchQuery = artist.name
-			this.activeView = 'albums'
+			this.setActiveTab('albums')
 		},
 		openTrackAlbum(track) {
 			const found = this.allAlbums.find(
