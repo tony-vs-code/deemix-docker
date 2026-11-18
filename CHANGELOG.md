@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.33] - 2026-11-18
+
+### Changed
+- Always-Expanded Sidebar: kept all sidebar submenu groups expanded by default without auto-collapsing on navigation, disabled slim-rail collapse, and added smooth scrolling for `.nav-links-list`.
+- Top-Level Navigation Groups: organized sidebar links under **Discover** (`Home`, `Search`, `Charts`), **Media & Queue** (`Library`, `Downloads`), and **System** (`Settings`: `Account`, `Plex`, `Downloads & Quality`, `Folders & Naming`, `Metadata & Tags`, `Artwork & Covers`, `General & Interface`, `Logs & Diagnostics`).
+
 ## [2026.11.32] - 2026-11-17
 
 ### Added
