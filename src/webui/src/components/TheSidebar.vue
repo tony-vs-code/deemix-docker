@@ -19,89 +19,103 @@
 		<!-- Nav Links -->
 		<nav class="nav-links-list">
 			<div
-				v-for="link in links"
-				:key="link.name"
-				class="nav-group"
-				:class="{ 'nav-group--expanded': !isSlim && hasChildren(link) && isExpanded(link) }"
-				@mouseenter="onNavItemEnter(link, $event)"
-				@mouseleave="onNavItemLeave"
+				v-for="(section, sectionIndex) in sidebarSections"
+				:key="section.id"
+				class="sidebar-section"
+				:class="{ 'sidebar-section--with-divider': sectionIndex > 0 }"
 			>
-				<div
-					class="nav-item-row"
-					:class="{
-						'active-link': activeTablink === link.name,
-						'has-children': hasChildren(link)
-					}"
-				>
-					<router-link v-slot="{ href, navigate }" custom :to="getParentRoute(link)">
-						<a
-							:href="href"
-							:aria-label="link.ariaLabel"
-							:title="isSlim ? $t(link.label) : ''"
-							class="nav-item group"
-							@click="onParentClick(link, navigate, $event)"
-						>
-							<div class="nav-icon-wrapper">
-								<i class="material-icons nav-icon">
-									{{ link.icon }}
-								</i>
-								<!-- Downloading pulse badge on icon if slim -->
-								<span v-if="isSlim && link.name === 'downloads' && downloadingCount > 0" class="slim-download-dot"></span>
-							</div>
-
-							<span v-if="!isSlim" class="nav-label">
-								{{ $t(link.label) }}
-							</span>
-
-							<!-- Active downloads badge on Downloads tab -->
-							<span
-								v-if="!isSlim && link.name === 'downloads' && downloadingCount > 0"
-								class="download-count-badge"
-								:title="`${downloadingCount} active downloads`"
-							>
-								<span class="badge-pulse"></span>
-								{{ downloadingCount }}
-							</span>
-						</a>
-					</router-link>
-
-					<!-- Submenu Expand/Collapse Chevron -->
-					<button
-						v-if="!isSlim && hasChildren(link)"
-						type="button"
-						class="submenu-toggle-btn"
-						:class="{ 'is-expanded': isExpanded(link) }"
-						:aria-expanded="isExpanded(link) ? 'true' : 'false'"
-						:aria-label="`Toggle ${link.ariaLabel} submenu`"
-						@click.stop="toggleSubmenu(link.name)"
-					>
-						<i class="material-icons submenu-chevron">expand_more</i>
-					</button>
+				<div v-if="!isSlim" class="sidebar-section-header">
+					<span class="sidebar-section-label">{{ section.label }}</span>
 				</div>
 
-				<!-- Collapsible Submenu List (Expanded Sidebar) -->
-				<transition name="submenu-collapse">
+				<div
+					v-for="link in section.links"
+					:key="link.name"
+					class="nav-group"
+					:class="{ 'nav-group--expanded': !isSlim && hasChildren(link) && isExpanded(link) }"
+					@mouseenter="onNavItemEnter(link, $event)"
+					@mouseleave="onNavItemLeave"
+				>
 					<div
-						v-if="!isSlim && hasChildren(link) && isExpanded(link)"
-						class="submenu-list"
-						:class="{ 'submenu-list--active-parent': activeTablink === link.name }"
-						role="menu"
+						class="nav-item-row"
+						:class="{
+							'active-link': activeTablink === link.name,
+							'has-children': hasChildren(link)
+						}"
 					>
-						<router-link
-							v-for="child in link.children"
-							:key="`${link.name}-${child.id}`"
-							:to="getChildRoute(link, child)"
-							class="submenu-item"
-							:class="{ 'submenu-item--active': isSubmenuActive(link, child) }"
-							role="menuitem"
-							@click.native="activeTablink = link.name"
-						>
-							<i class="material-icons submenu-icon">{{ child.icon }}</i>
-							<span class="submenu-label">{{ child.labelKey ? $t(child.labelKey) : child.label }}</span>
-							<span v-if="isSubmenuActive(link, child)" class="submenu-active-dot"></span>
+						<router-link v-slot="{ href, navigate }" custom :to="getParentRoute(link)">
+							<a
+								:href="href"
+								:aria-label="link.ariaLabel"
+								:title="isSlim ? $t(link.label) : ''"
+								class="nav-item group"
+								@click="onParentClick(link, navigate, $event)"
+							>
+								<div class="nav-icon-wrapper">
+									<i class="material-icons nav-icon">
+										{{ link.icon }}
+									</i>
+									<!-- Downloading pulse badge on icon if slim -->
+									<span
+										v-if="isSlim && link.name === 'downloads' && downloadingCount > 0"
+										class="slim-download-dot"
+									></span>
+								</div>
+
+								<span v-if="!isSlim" class="nav-label">
+									{{ $t(link.label) }}
+								</span>
+
+								<!-- Active downloads badge on Downloads tab -->
+								<span
+									v-if="!isSlim && link.name === 'downloads' && downloadingCount > 0"
+									class="download-count-badge"
+									:title="`${downloadingCount} active downloads`"
+								>
+									<span class="badge-pulse"></span>
+									{{ downloadingCount }}
+								</span>
+							</a>
 						</router-link>
+
+						<!-- Submenu Expand/Collapse Chevron -->
+						<button
+							v-if="!isSlim && hasChildren(link)"
+							type="button"
+							class="submenu-toggle-btn"
+							:class="{ 'is-expanded': isExpanded(link) }"
+							:aria-expanded="isExpanded(link) ? 'true' : 'false'"
+							:aria-label="`Toggle ${link.ariaLabel} submenu`"
+							@click.stop="toggleSubmenu(link.name)"
+						>
+							<i class="material-icons submenu-chevron">expand_more</i>
+						</button>
 					</div>
-				</transition>
+
+					<!-- Collapsible Submenu List (Expanded Sidebar) -->
+					<transition name="submenu-collapse">
+						<div
+							v-if="!isSlim && hasChildren(link) && isExpanded(link)"
+							class="submenu-list"
+							:class="{ 'submenu-list--active-parent': activeTablink === link.name }"
+							role="menu"
+						>
+							<router-link
+								v-for="child in link.children"
+								:key="`${link.name}-${child.id}`"
+								:to="getChildRoute(link, child)"
+								class="submenu-item"
+								:class="{ 'submenu-item--active': isSubmenuActive(link, child) }"
+								role="menuitem"
+								@click.native="activeTablink = link.name"
+							>
+								<i class="material-icons submenu-icon">{{ child.icon }}</i>
+								<span class="submenu-label">{{ child.labelKey ? $t(child.labelKey) : child.label }}</span>
+								<span v-if="isSubmenuActive(link, child)" class="submenu-active-dot"></span>
+							</router-link>
+						</div>
+					</transition>
+				</div>
 			</div>
 		</nav>
 
@@ -157,7 +171,7 @@
 
 <script>
 import { computed, defineComponent, onBeforeUnmount, onMounted, reactive, ref, toRefs, watch } from '@vue/composition-api'
-import { links, resolveLinkChildId } from '@/data/sidebar'
+import { links, resolveLinkChildId, sidebarSections } from '@/data/sidebar'
 import { useTheme } from '@/use/theme'
 import { socket } from '@/utils/socket'
 import { fetchData } from '@/utils/api'
@@ -172,20 +186,22 @@ export default defineComponent({
 		const initialExpanded = {}
 		links.forEach(link => {
 			if (link.children && link.children.length) {
-				initialExpanded[link.name] = activeTab ? activeTab.name === link.name : false
+				initialExpanded[link.name] = true
 			}
 		})
 
 		const state = reactive({
 			activeTablink: activeTab ? activeTab.name : 'home',
 			expandedMenus: initialExpanded,
-			links
+			links,
+			sidebarSections
 		})
 
 		const sidebarEl = ref(null)
 		const currentRouteName = ref(initialRoute.name || 'Home')
 		const currentRouteQuery = ref({ ...(initialRoute.query || {}) })
-		const isSlim = computed(() => ctx.root.$store.getters.getSlimSidebar)
+		// Always keep the sidebar expanded so all groups and submenus remain directly accessible
+		const isSlim = computed(() => false)
 
 		// Floating submenu popover state for slim-sidebar mode
 		const slimPopover = ref(null)
@@ -472,7 +488,7 @@ export default defineComponent({
 			socket.off('queueOrderUpdated', handleQueueOrderUpdated)
 		})
 
-		ctx.root.$router.afterEach((to, from) => {
+		ctx.root.$router.afterEach(to => {
 			currentRouteName.value = to.name
 			currentRouteQuery.value = { ...(to.query || {}) }
 			closeSlimPopover()
@@ -481,13 +497,7 @@ export default defineComponent({
 			if (!linkInSidebar) return
 			state.activeTablink = linkInSidebar.name
 
-			if (!from || to.name !== from.name) {
-				state.links.forEach(link => {
-					if (hasChildren(link)) {
-						state.expandedMenus[link.name] = link.name === linkInSidebar.name
-					}
-				})
-			} else if (hasChildren(linkInSidebar)) {
+			if (hasChildren(linkInSidebar)) {
 				state.expandedMenus[linkInSidebar.name] = true
 			}
 		})
@@ -544,7 +554,7 @@ export default defineComponent({
 .brand-header {
 	display: flex;
 	align-items: center;
-	padding: 1.5rem 1.25rem 1.25rem 1.25rem;
+	padding: 1.25rem 1.25rem 0.85rem 1.25rem;
 	gap: 0.75rem;
 }
 
@@ -606,15 +616,19 @@ export default defineComponent({
 .nav-links-list {
 	display: flex;
 	flex-direction: column;
-	padding: 0.75rem 0.75rem;
-	gap: 0.35rem;
+	padding: 0.4rem 0.75rem 0.85rem 0.75rem;
+	gap: 0.25rem;
 	flex: 1;
+	min-height: 0;
 	overflow-y: auto;
 	overflow-x: hidden;
+	scroll-behavior: smooth;
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-color-hover) transparent;
 }
 
 .nav-links-list::-webkit-scrollbar {
-	width: 4px;
+	width: 5px;
 }
 
 .nav-links-list::-webkit-scrollbar-track {
@@ -622,13 +636,48 @@ export default defineComponent({
 }
 
 .nav-links-list::-webkit-scrollbar-thumb {
-	background: var(--main-scroll);
+	background: var(--border-color-hover);
 	border-radius: 9999px;
+	transition: background-color 0.2s ease;
+}
+
+.nav-links-list:hover::-webkit-scrollbar-thumb {
+	background: var(--main-scroll);
 }
 
 .slim-sidebar .nav-links-list {
 	padding: 0.75rem 0.35rem;
 	align-items: center;
+}
+
+.sidebar-section {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+}
+
+.sidebar-section--with-divider {
+	margin-top: 0.45rem;
+	padding-top: 0.65rem;
+	border-top: 1px solid var(--border-color);
+}
+
+.sidebar-section-header {
+	display: flex;
+	align-items: center;
+	padding: 0.15rem 0.75rem 0.3rem 0.75rem;
+}
+
+.sidebar-section-label {
+	font-size: 0.6875rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.085em;
+	color: var(--secondary-text);
+	opacity: 0.72;
+	line-height: 1;
+	white-space: nowrap;
+	user-select: none;
 }
 
 .nav-group {
@@ -644,7 +693,7 @@ export default defineComponent({
 .nav-item-row {
 	display: flex;
 	align-items: center;
-	height: 2.75rem;
+	height: 2.5rem;
 	border-radius: 0.75rem;
 	color: var(--secondary-text);
 	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -762,9 +811,9 @@ export default defineComponent({
 .submenu-list {
 	display: flex;
 	flex-direction: column;
-	gap: 0.15rem;
-	margin: 0.3rem 0 0.3rem 1.25rem;
-	padding-left: 0.65rem;
+	gap: 0.125rem;
+	margin: 0.25rem 0 0.35rem 1.15rem;
+	padding-left: 0.55rem;
 	border-left: 1.5px solid var(--border-color-hover);
 }
 
@@ -775,9 +824,9 @@ export default defineComponent({
 .submenu-item {
 	display: flex;
 	align-items: center;
-	gap: 0.55rem;
-	height: 2.1rem;
-	padding: 0 0.65rem;
+	gap: 0.5rem;
+	height: 1.95rem;
+	padding: 0 0.55rem;
 	border-radius: 0.55rem;
 	color: var(--secondary-text);
 	text-decoration: none;
@@ -1007,7 +1056,7 @@ export default defineComponent({
 
 /* Sidebar Footer / Theme Toggle */
 .sidebar-footer {
-	padding: 1rem 0.75rem;
+	padding: 0.85rem 0.75rem;
 	border-top: 1px solid var(--border-color);
 }
 

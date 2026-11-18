@@ -1,119 +1,145 @@
-export const links = [
+export const sidebarSections = [
 	{
-		name: 'home',
-		ariaLabel: 'home',
-		routerName: 'Home',
-		icon: 'home',
-		label: 'sidebar.home'
-	},
-	{
-		name: 'search',
-		ariaLabel: 'search',
-		routerName: 'Search',
-		icon: 'search',
-		label: 'sidebar.search'
-	},
-	{
-		name: 'charts',
-		ariaLabel: 'charts',
-		routerName: 'Charts',
-		icon: 'show_chart',
-		label: 'sidebar.charts'
-	},
-	{
-		name: 'downloads',
-		ariaLabel: 'downloads',
-		routerName: 'Downloads',
-		icon: 'cloud_download',
-		label: 'sidebar.downloads',
-		queryKey: 'filter',
-		defaultChild: 'queue',
-		children: [
-			{ id: 'queue', label: 'Queue', labelKey: 'downloadsPage.tabs.queue', icon: 'queue_music' },
-			{ id: 'downloading', label: 'Downloading', labelKey: 'downloadsPage.tabs.downloading', icon: 'downloading' },
-			{ id: 'queued', label: 'Queued', labelKey: 'downloadsPage.tabs.queued', icon: 'hourglass_top' },
-			{ id: 'completed', label: 'Completed', labelKey: 'downloadsPage.tabs.completed', icon: 'check_circle' },
-			{ id: 'failed', label: 'Failed', labelKey: 'downloadsPage.tabs.failed', icon: 'error_outline' }
+		id: 'discover',
+		label: 'Discover',
+		links: [
+			{
+				name: 'home',
+				section: 'discover',
+				ariaLabel: 'home',
+				routerName: 'Home',
+				icon: 'home',
+				label: 'sidebar.home'
+			},
+			{
+				name: 'search',
+				section: 'discover',
+				ariaLabel: 'search',
+				routerName: 'Search',
+				icon: 'search',
+				label: 'sidebar.search'
+			},
+			{
+				name: 'charts',
+				section: 'discover',
+				ariaLabel: 'charts',
+				routerName: 'Charts',
+				icon: 'show_chart',
+				label: 'sidebar.charts'
+			}
 		]
 	},
 	{
-		name: 'library',
-		ariaLabel: 'library',
-		routerName: 'Library',
-		icon: 'library_music',
-		label: 'sidebar.library',
-		queryKey: 'tab',
-		defaultChild: 'albums',
-		children: [
-			{ id: 'albums', label: 'Albums', labelKey: 'libraryPage.stats.albums', icon: 'album' },
-			{ id: 'tracks', label: 'Tracks', labelKey: 'libraryPage.stats.tracks', icon: 'audiotrack' },
-			{ id: 'artists', label: 'Artists', labelKey: 'libraryPage.stats.artists', icon: 'person' }
-		]
-	},
-	{
-		name: 'settings',
-		ariaLabel: 'settings',
-		routerName: 'Settings',
-		icon: 'settings',
-		label: 'sidebar.settings',
-		queryKey: 'tab',
-		defaultChild: 'account',
-		aliases: {
-			files: 'folders',
-			tags: 'metadata'
-		},
-		children: [
+		id: 'media-queue',
+		label: 'Media & Queue',
+		links: [
 			{
-				id: 'account',
-				label: 'Account',
-				icon: 'person',
-				subtitle: 'Manage your Deezer session, ARL token, and Spotify credentials'
+				name: 'library',
+				section: 'media-queue',
+				ariaLabel: 'library',
+				routerName: 'Library',
+				icon: 'library_music',
+				label: 'sidebar.library',
+				queryKey: 'tab',
+				defaultChild: 'albums',
+				children: [
+					{ id: 'albums', label: 'Albums', labelKey: 'libraryPage.stats.albums', icon: 'album' },
+					{ id: 'tracks', label: 'Tracks', labelKey: 'libraryPage.stats.tracks', icon: 'audiotrack' },
+					{ id: 'artists', label: 'Artists', labelKey: 'libraryPage.stats.artists', icon: 'person' }
+				]
 			},
 			{
-				id: 'general',
-				label: 'General & Interface',
-				icon: 'tune',
-				subtitle: 'Configure UI language, appearance, and interface preferences'
-			},
-			{
-				id: 'downloads',
-				label: 'Downloads & Quality',
+				name: 'downloads',
+				section: 'media-queue',
+				ariaLabel: 'downloads',
+				routerName: 'Downloads',
 				icon: 'cloud_download',
-				subtitle: 'Set preferred bitrate, concurrency, file overwrite, and download behavior'
-			},
+				label: 'sidebar.downloads',
+				queryKey: 'filter',
+				defaultChild: 'queue',
+				children: [
+					{ id: 'queue', label: 'Queue', labelKey: 'downloadsPage.tabs.queue', icon: 'queue_music' },
+					{ id: 'downloading', label: 'Downloading', labelKey: 'downloadsPage.tabs.downloading', icon: 'downloading' },
+					{ id: 'queued', label: 'Queued', labelKey: 'downloadsPage.tabs.queued', icon: 'hourglass_top' },
+					{ id: 'completed', label: 'Completed', labelKey: 'downloadsPage.tabs.completed', icon: 'check_circle' },
+					{ id: 'failed', label: 'Failed', labelKey: 'downloadsPage.tabs.failed', icon: 'error_outline' }
+				]
+			}
+		]
+	},
+	{
+		id: 'system',
+		label: 'System',
+		links: [
 			{
-				id: 'folders',
-				label: 'Folders & Naming',
-				icon: 'create_new_folder',
-				subtitle: 'Customize track filename templates and folder hierarchy'
-			},
-			{
-				id: 'metadata',
-				label: 'Metadata & Tags',
-				icon: 'bookmarks',
-				subtitle: 'Choose embedded audio tags, artist formatting, and casing rules'
-			},
-			{
-				id: 'artwork',
-				label: 'Artwork & Covers',
-				icon: 'image',
-				subtitle: 'Configure cover art sizing, formats, and local image saving'
-			},
-			{
-				id: 'plex',
-				label: 'Plex',
-				icon: 'cast_connected',
-				subtitle: 'Connect Plex Media Server for automatic library refreshes'
-			},
-			{
-				id: 'logs',
-				label: 'Logs & Diagnostics',
-				icon: 'receipt_long',
-				subtitle: 'Inspect real-time application logs and filesystem permissions'
+				name: 'settings',
+				section: 'system',
+				ariaLabel: 'settings',
+				routerName: 'Settings',
+				icon: 'settings',
+				label: 'sidebar.settings',
+				queryKey: 'tab',
+				defaultChild: 'account',
+				aliases: {
+					files: 'folders',
+					tags: 'metadata'
+				},
+				children: [
+					{
+						id: 'account',
+						label: 'Account',
+						icon: 'person',
+						subtitle: 'Manage your Deezer session, ARL token, and Spotify credentials'
+					},
+					{
+						id: 'plex',
+						label: 'Plex',
+						icon: 'cast_connected',
+						subtitle: 'Connect Plex Media Server for automatic library refreshes'
+					},
+					{
+						id: 'downloads',
+						label: 'Downloads & Quality',
+						icon: 'cloud_download',
+						subtitle: 'Set preferred bitrate, concurrency, file overwrite, and download behavior'
+					},
+					{
+						id: 'folders',
+						label: 'Folders & Naming',
+						icon: 'create_new_folder',
+						subtitle: 'Customize track filename templates and folder hierarchy'
+					},
+					{
+						id: 'metadata',
+						label: 'Metadata & Tags',
+						icon: 'bookmarks',
+						subtitle: 'Choose embedded audio tags, artist formatting, and casing rules'
+					},
+					{
+						id: 'artwork',
+						label: 'Artwork & Covers',
+						icon: 'image',
+						subtitle: 'Configure cover art sizing, formats, and local image saving'
+					},
+					{
+						id: 'general',
+						label: 'General & Interface',
+						icon: 'tune',
+						subtitle: 'Configure UI language, appearance, and interface preferences'
+					},
+					{
+						id: 'logs',
+						label: 'Logs & Diagnostics',
+						icon: 'receipt_long',
+						subtitle: 'Inspect real-time application logs and filesystem permissions'
+					}
+				]
 			}
 		]
 	}
 ]
+
+export const links = sidebarSections.reduce((acc, section) => acc.concat(section.links), [])
 
 export function getSidebarLink(name) {
 	return links.find(link => link.name === name) || null
