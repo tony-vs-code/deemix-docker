@@ -26,28 +26,8 @@
 				</div>
 			</div>
 
-			<!-- Source Switcher & Rescan Button -->
+			<!-- Rescan Button -->
 			<div class="header-actions">
-				<div v-if="isPlexAvailable" class="source-switcher" role="group" :aria-label="$t('libraryPage.sourceLabel')">
-					<button
-						type="button"
-						class="source-pill-btn"
-						:class="{ 'source-pill-plex-active': activeSource === 'plex' }"
-						@click="setLibrarySource('plex')"
-					>
-						<i class="material-icons source-pill-icon">cast_connected</i>
-						<span>{{ $t('libraryPage.sourcePlex') }}</span>
-					</button>
-					<button
-						type="button"
-						class="source-pill-btn"
-						:class="{ 'source-pill-local-active': activeSource === 'local' }"
-						@click="setLibrarySource('local')"
-					>
-						<i class="material-icons source-pill-icon">folder</i>
-						<span>{{ $t('libraryPage.sourceLocal') }}</span>
-					</button>
-				</div>
 				<button class="btn btn-primary action-btn" :disabled="isScanning || isLoadingLibrary" @click="rescanLibrary(false)">
 					<i class="material-icons btn-icon" :class="{ 'spin-active': isScanning }">sync</i>
 					<span>{{
@@ -75,10 +55,10 @@
 					<i class="material-icons text-sm mr-1">refresh</i>
 					<span>{{ $t('libraryPage.retryPlex') }}</span>
 				</button>
-				<button type="button" class="btn btn-secondary btn-sm" @click="setLibrarySource('local')">
-					<i class="material-icons text-sm mr-1">folder</i>
-					<span>{{ $t('libraryPage.switchToLocal') }}</span>
-				</button>
+				<router-link :to="{ name: 'Settings', query: { tab: 'plex' } }" class="btn btn-secondary btn-sm">
+					<i class="material-icons text-sm mr-1">settings</i>
+					<span>{{ $t('libraryPage.plexSettings') }}</span>
+				</router-link>
 			</div>
 		</div>
 
@@ -1042,7 +1022,6 @@ export default {
 		const storedSettings = loadStoredPlayerSettings()
 		return {
 			activeTab: resolveLinkChildId(libraryLink, this.$route ? this.$route.query : {}),
-			librarySource: 'auto',
 			plexEnabled: false,
 			plexConfigured: false,
 			plexServerUrl: '',
@@ -1087,8 +1066,6 @@ export default {
 			return this.plexEnabled && this.plexConfigured
 		},
 		activeSource() {
-			if (this.librarySource === 'local') return 'local'
-			if (this.librarySource === 'plex') return this.isPlexAvailable ? 'plex' : 'local'
 			return this.isPlexAvailable ? 'plex' : 'local'
 		},
 		volumeIcon() {
@@ -1839,17 +1816,6 @@ export default {
 				}
 			}
 		},
-		setLibrarySource(source) {
-			if (source !== 'plex' && source !== 'local') return
-			if (source === this.activeSource && this.librarySource === source) return
-			this.librarySource = source
-			this.selectedAlbum = null
-			this.pendingDelete = null
-			this.albumCurrentPage = 1
-			this.trackCurrentPage = 1
-			this.plexError = ''
-			this.loadLibrary()
-		},
 		async syncPlexAvailability() {
 			try {
 				const cfg = await fetchData('plex/settings')
@@ -1862,13 +1828,10 @@ export default {
 				this.plexEnabled = nextEnabled
 				this.plexConfigured = nextConfigured
 				this.plexServerUrl = cfg.serverUrl || ''
-				if (nextAvailable && (!wasAvailable || prevUrl !== this.plexServerUrl) && this.librarySource !== 'local') {
+				if (nextAvailable && (!wasAvailable || prevUrl !== this.plexServerUrl)) {
 					await this.loadLibrary()
 				} else if (!nextAvailable && wasAvailable) {
 					this.plexError = ''
-					if (this.librarySource === 'plex') {
-						this.librarySource = 'auto'
-					}
 					await this.loadLibrary()
 				}
 			} catch (error) {
@@ -1878,29 +1841,45 @@ export default {
 		async loadLibrary(forceRefresh = false) {
 			this.isLoadingLibrary = true
 			this.plexError = ''
+			let checkedPlexSettings = false
 			try {
-				if (this.librarySource !== 'local') {
+				try {
+					const cfg = await fetchData('plex/settings')
+					if (cfg) {
+						checkedPlexSettings = true
+						this.plexEnabled = Boolean(cfg.enabled)
+						this.plexConfigured = Boolean(cfg.serverUrl && cfg.token)
+						this.plexServerUrl = cfg.serverUrl || ''
+					}
+				} catch (cfgErr) {
+					// Proceed to plex/library check if settings lookup fails
+				}
+
+				if (!checkedPlexSettings || this.isPlexAvailable) {
 					try {
 						const params = forceRefresh ? { refresh: 'true' } : {}
 						const plexData = await fetchData('plex/library', params)
 						if (plexData && plexData.enabled && plexData.configured) {
 							this.plexEnabled = true
 							this.plexConfigured = true
-							this.plexServerUrl = plexData.serverUrl || ''
-							this.librarySource = 'plex'
+							this.plexServerUrl = plexData.serverUrl || this.plexServerUrl || ''
 							this.plexError = plexData.error || ''
 							this.applyLibraryData(plexData)
+							return
+						}
+						if (this.isPlexAvailable) {
+							this.plexError = (plexData && plexData.error) || 'Failed to load Plex library'
+							if (plexData) {
+								this.applyLibraryData(plexData)
+							}
 							return
 						}
 						this.plexEnabled = Boolean(plexData && plexData.enabled)
 						this.plexConfigured = Boolean(plexData && plexData.configured)
 						this.plexServerUrl = (plexData && plexData.serverUrl) || ''
-						if (this.librarySource === 'plex') {
-							this.librarySource = 'auto'
-						}
 					} catch (plexErr) {
-						console.warn('Failed to query Plex library, falling back to local library:', plexErr)
-						if (this.librarySource === 'plex') {
+						console.warn('Failed to query Plex library:', plexErr)
+						if (this.isPlexAvailable) {
 							this.plexError = (plexErr && plexErr.message) || 'Failed to load Plex library'
 							return
 						}
@@ -1931,7 +1910,9 @@ export default {
 					if (plexData && plexData.error) {
 						this.plexError = plexData.error
 					}
-					this.applyLibraryData(plexData)
+					if (plexData) {
+						this.applyLibraryData(plexData)
+					}
 					return
 				}
 
@@ -2199,54 +2180,6 @@ export default {
 	align-items: center;
 	flex-wrap: wrap;
 	gap: 0.75rem;
-}
-
-.source-switcher {
-	display: inline-flex;
-	align-items: center;
-	background: var(--card-background);
-	border: 1px solid var(--border-color);
-	border-radius: 0.75rem;
-	padding: 0.2rem;
-	gap: 0.2rem;
-	height: 2.5rem;
-}
-
-.source-pill-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.35rem;
-	padding: 0 0.75rem;
-	height: 100%;
-	border: none;
-	border-radius: 0.55rem;
-	background: transparent;
-	color: var(--secondary-text);
-	font-size: 0.8125rem;
-	font-weight: 700;
-	cursor: pointer;
-	transition: all 0.18s ease;
-}
-
-.source-pill-btn:hover {
-	color: var(--foreground);
-	background: rgba(255, 255, 255, 0.04);
-}
-
-.source-pill-icon {
-	font-size: 1rem;
-}
-
-.source-pill-plex-active {
-	background: linear-gradient(135deg, #e5a00d 0%, #d97706 100%);
-	color: #0f172a !important;
-	box-shadow: 0 2px 10px rgba(229, 160, 13, 0.35);
-}
-
-.source-pill-local-active {
-	background: var(--primary-color);
-	color: #fff !important;
-	box-shadow: 0 2px 10px rgba(var(--primary-color-rgb, 124, 58, 237), 0.35);
 }
 
 .plex-badge-icon {

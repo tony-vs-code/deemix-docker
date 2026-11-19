@@ -1,22 +1,15 @@
 <template>
-	<aside
-		id="sidebar"
-		ref="sidebarEl"
-		:class="{ 'slim-sidebar': isSlim }"
-		aria-label="sidebar"
-		class="sidebar-nav"
-		role="navigation"
-	>
+	<aside id="sidebar" aria-label="sidebar" class="sidebar-nav" role="navigation">
 		<!-- Brand Header -->
 		<div class="brand-header">
 			<div class="deemix-icon-container" v-html="deemixIcon" />
-			<div v-if="!isSlim" class="brand-text">
+			<div class="brand-text">
 				<span class="brand-name">deemix</span>
 				<span class="brand-badge">PRO</span>
 			</div>
 		</div>
 
-		<!-- Nav Links -->
+		<!-- Nav Sections (Always-Expanded 2-Level Hierarchy) -->
 		<nav class="nav-links-list">
 			<div
 				v-for="(section, sectionIndex) in sidebarSections"
@@ -24,132 +17,48 @@
 				class="sidebar-section"
 				:class="{ 'sidebar-section--with-divider': sectionIndex > 0 }"
 			>
-				<div v-if="!isSlim" class="sidebar-section-header">
+				<div class="sidebar-section-header">
 					<span class="sidebar-section-label">{{ section.label }}</span>
 				</div>
 
-				<div
-					v-for="link in section.links"
-					:key="link.name"
-					class="nav-group"
-					:class="{ 'nav-group--expanded': !isSlim && hasChildren(link) && isExpanded(link) }"
-					@mouseenter="onNavItemEnter(link, $event)"
-					@mouseleave="onNavItemLeave"
+				<router-link
+					v-for="item in section.links"
+					:key="item.name"
+					v-slot="{ href, navigate }"
+					custom
+					:to="getItemRoute(item)"
 				>
-					<div
-						class="nav-item-row"
-						:class="{
-							'active-link': activeTablink === link.name,
-							'has-children': hasChildren(link)
-						}"
+					<a
+						:href="href"
+						:aria-label="item.ariaLabel"
+						class="nav-item group"
+						:class="{ 'active-link': isItemActive(item) }"
+						:aria-current="isItemActive(item) ? 'page' : undefined"
+						@click="navigate($event)"
 					>
-						<router-link v-slot="{ href, navigate }" custom :to="getParentRoute(link)">
-							<a
-								:href="href"
-								:aria-label="link.ariaLabel"
-								:title="isSlim ? $t(link.label) : ''"
-								class="nav-item group"
-								@click="onParentClick(link, navigate, $event)"
-							>
-								<div class="nav-icon-wrapper">
-									<i class="material-icons nav-icon">
-										{{ link.icon }}
-									</i>
-									<!-- Downloading pulse badge on icon if slim -->
-									<span
-										v-if="isSlim && link.name === 'downloads' && downloadingCount > 0"
-										class="slim-download-dot"
-									></span>
-								</div>
-
-								<span v-if="!isSlim" class="nav-label">
-									{{ $t(link.label) }}
-								</span>
-
-								<!-- Active downloads badge on Downloads tab -->
-								<span
-									v-if="!isSlim && link.name === 'downloads' && downloadingCount > 0"
-									class="download-count-badge"
-									:title="`${downloadingCount} active downloads`"
-								>
-									<span class="badge-pulse"></span>
-									{{ downloadingCount }}
-								</span>
-							</a>
-						</router-link>
-
-						<!-- Submenu Expand/Collapse Chevron -->
-						<button
-							v-if="!isSlim && hasChildren(link)"
-							type="button"
-							class="submenu-toggle-btn"
-							:class="{ 'is-expanded': isExpanded(link) }"
-							:aria-expanded="isExpanded(link) ? 'true' : 'false'"
-							:aria-label="`Toggle ${link.ariaLabel} submenu`"
-							@click.stop="toggleSubmenu(link.name)"
-						>
-							<i class="material-icons submenu-chevron">expand_more</i>
-						</button>
-					</div>
-
-					<!-- Collapsible Submenu List (Expanded Sidebar) -->
-					<transition name="submenu-collapse">
-						<div
-							v-if="!isSlim && hasChildren(link) && isExpanded(link)"
-							class="submenu-list"
-							:class="{ 'submenu-list--active-parent': activeTablink === link.name }"
-							role="menu"
-						>
-							<router-link
-								v-for="child in link.children"
-								:key="`${link.name}-${child.id}`"
-								:to="getChildRoute(link, child)"
-								class="submenu-item"
-								:class="{ 'submenu-item--active': isSubmenuActive(link, child) }"
-								role="menuitem"
-								@click.native="activeTablink = link.name"
-							>
-								<i class="material-icons submenu-icon">{{ child.icon }}</i>
-								<span class="submenu-label">{{ child.labelKey ? $t(child.labelKey) : child.label }}</span>
-								<span v-if="isSubmenuActive(link, child)" class="submenu-active-dot"></span>
-							</router-link>
+						<div class="nav-icon-wrapper">
+							<i class="material-icons nav-icon">
+								{{ item.icon }}
+							</i>
 						</div>
-					</transition>
-				</div>
+
+						<span class="nav-label">
+							{{ item.labelKey ? $t(item.labelKey) : item.label }}
+						</span>
+
+						<!-- Active downloads badge on Queue item -->
+						<span
+							v-if="item.showDownloadBadge && downloadingCount > 0"
+							class="download-count-badge"
+							:title="`${downloadingCount} active downloads`"
+						>
+							<span class="badge-pulse"></span>
+							{{ downloadingCount }}
+						</span>
+					</a>
+				</router-link>
 			</div>
 		</nav>
-
-		<!-- Floating Submenu Popover for Slim Sidebar Mode -->
-		<transition name="popover-fade">
-			<div
-				v-if="isSlim && slimPopover && slimPopover.link"
-				class="slim-submenu-popover"
-				:style="{ top: `${slimPopover.top}px` }"
-				role="menu"
-				@mouseenter="cancelCloseSlimPopover"
-				@mouseleave="scheduleCloseSlimPopover"
-			>
-				<div class="slim-popover-header">
-					<i class="material-icons slim-popover-header-icon">{{ slimPopover.link.icon }}</i>
-					<span class="slim-popover-title">{{ $t(slimPopover.link.label) }}</span>
-				</div>
-				<div class="slim-popover-items">
-					<router-link
-						v-for="child in slimPopover.link.children"
-						:key="`slim-${slimPopover.link.name}-${child.id}`"
-						:to="getChildRoute(slimPopover.link, child)"
-						class="slim-popover-item"
-						:class="{ 'slim-popover-item--active': isSubmenuActive(slimPopover.link, child) }"
-						role="menuitem"
-						@click.native="onSlimChildClick(slimPopover.link)"
-					>
-						<i class="material-icons submenu-icon">{{ child.icon }}</i>
-						<span class="submenu-label">{{ child.labelKey ? $t(child.labelKey) : child.label }}</span>
-						<span v-if="isSubmenuActive(slimPopover.link, child)" class="submenu-active-dot"></span>
-					</router-link>
-				</div>
-			</div>
-		</transition>
 
 		<!-- Bottom Theme Toggler -->
 		<div class="sidebar-footer">
@@ -161,7 +70,7 @@
 				<i class="material-icons theme-icon">
 					{{ currentTheme === 'dark' ? 'light_mode' : 'dark_mode' }}
 				</i>
-				<span v-if="!isSlim" class="theme-label">
+				<span class="theme-label">
 					{{ currentTheme === 'dark' ? 'Light Mode' : 'Dark Mode' }}
 				</span>
 			</button>
@@ -170,8 +79,8 @@
 </template>
 
 <script>
-import { computed, defineComponent, onBeforeUnmount, onMounted, reactive, ref, toRefs, watch } from '@vue/composition-api'
-import { links, resolveLinkChildId, sidebarSections } from '@/data/sidebar'
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from '@vue/composition-api'
+import { getSidebarLink, resolveLinkChildId, sidebarSections } from '@/data/sidebar'
 import { useTheme } from '@/use/theme'
 import { socket } from '@/utils/socket'
 import { fetchData } from '@/utils/api'
@@ -180,158 +89,53 @@ import deemixIcon from '@/assets/deemix-icon.svg'
 export default defineComponent({
 	name: 'TheSidebar',
 	setup(_, ctx) {
-		const initialRoute = ctx.root.$route || { name: 'Home', query: {} }
-		const activeTab = links.find(link => link.routerName === initialRoute.name)
-
-		const initialExpanded = {}
-		links.forEach(link => {
-			if (link.children && link.children.length) {
-				initialExpanded[link.name] = true
-			}
-		})
-
-		const state = reactive({
-			activeTablink: activeTab ? activeTab.name : 'home',
-			expandedMenus: initialExpanded,
-			links,
-			sidebarSections
-		})
-
-		const sidebarEl = ref(null)
+		const initialRoute = (ctx.root && ctx.root.$route) || { name: 'Home', query: {} }
 		const currentRouteName = ref(initialRoute.name || 'Home')
 		const currentRouteQuery = ref({ ...(initialRoute.query || {}) })
-		// Always keep the sidebar expanded so all groups and submenus remain directly accessible
-		const isSlim = computed(() => false)
 
-		// Floating submenu popover state for slim-sidebar mode
-		const slimPopover = ref(null)
-		let slimCloseTimer = null
-
-		const cancelCloseSlimPopover = () => {
-			if (slimCloseTimer) {
-				clearTimeout(slimCloseTimer)
-				slimCloseTimer = null
-			}
+		const syncRouteState = route => {
+			if (!route) return
+			currentRouteName.value = route.name || ''
+			currentRouteQuery.value = { ...(route.query || {}) }
 		}
 
-		const closeSlimPopover = () => {
-			cancelCloseSlimPopover()
-			slimPopover.value = null
+		watch(
+			() => ctx.root && ctx.root.$route,
+			route => {
+				syncRouteState(route)
+			},
+			{ immediate: true, deep: true }
+		)
+
+		let removeAfterEach = null
+		if (ctx.root && ctx.root.$router && typeof ctx.root.$router.afterEach === 'function') {
+			removeAfterEach = ctx.root.$router.afterEach(to => {
+				syncRouteState(to)
+			})
 		}
 
-		const scheduleCloseSlimPopover = () => {
-			cancelCloseSlimPopover()
-			slimCloseTimer = setTimeout(() => {
-				slimPopover.value = null
-				slimCloseTimer = null
-			}, 160)
-		}
-
-		const openSlimPopoverFromElement = (link, targetEl, openedByHover) => {
-			if (!link || !link.children || !link.children.length || !targetEl) return
-			cancelCloseSlimPopover()
-			const rect = targetEl.getBoundingClientRect()
-			const estimatedHeight = 48 + link.children.length * 36 + 16
-			const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800
-			const maxTop = Math.max(12, viewportHeight - estimatedHeight - 16)
-			const top = Math.max(12, Math.min(rect.top, maxTop))
-			slimPopover.value = { link, top, openedByHover }
-		}
-
-		const onNavItemEnter = (link, event) => {
-			if (!isSlim.value) return
-			if (!link.children || !link.children.length) {
-				closeSlimPopover()
-				return
-			}
-			openSlimPopoverFromElement(link, event.currentTarget, true)
-		}
-
-		const onNavItemLeave = () => {
-			if (!isSlim.value) return
-			scheduleCloseSlimPopover()
-		}
-
-		const hasChildren = link => Boolean(link && link.children && link.children.length)
-		const isExpanded = link => Boolean(state.expandedMenus[link.name])
-
-		const toggleSubmenu = linkName => {
-			state.expandedMenus[linkName] = !state.expandedMenus[linkName]
-		}
-
-		const getParentRoute = link => {
-			if (link.children && link.children.length && link.queryKey && link.defaultChild) {
+		const getItemRoute = item => {
+			if (!item) return { name: 'Home' }
+			if (item.to) return item.to
+			if (item.queryKey && item.childId) {
 				return {
-					name: link.routerName,
-					query: { [link.queryKey]: link.defaultChild }
+					name: item.routerName,
+					query: { [item.queryKey]: item.childId }
 				}
 			}
-			return { name: link.routerName }
+			return { name: item.routerName }
 		}
 
-		const getChildRoute = (link, child) => ({
-			name: link.routerName,
-			query: { [link.queryKey]: child.id }
-		})
-
-		const isSubmenuActive = (link, child) => {
-			if (currentRouteName.value !== link.routerName) return false
-			return resolveLinkChildId(link, currentRouteQuery.value) === child.id
+		const isItemActive = item => {
+			if (!item || currentRouteName.value !== item.routerName) return false
+			if (!item.childId) return true
+			const parentLink = item.parentName ? getSidebarLink(item.parentName) : null
+			return resolveLinkChildId(parentLink || item, currentRouteQuery.value) === item.childId
 		}
-
-		const onParentClick = (link, navigate, event) => {
-			if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-				navigate(event)
-				return
-			}
-			state.activeTablink = link.name
-			if (hasChildren(link)) {
-				if (isSlim.value) {
-					const isAlreadyOnRoute = currentRouteName.value === link.routerName
-					if (isAlreadyOnRoute && (!slimPopover.value || !slimPopover.value.openedByHover)) {
-						event.preventDefault()
-						if (slimPopover.value && slimPopover.value.link && slimPopover.value.link.name === link.name) {
-							closeSlimPopover()
-						} else {
-							openSlimPopoverFromElement(link, event.currentTarget, false)
-						}
-						return
-					}
-					closeSlimPopover()
-				} else {
-					state.expandedMenus[link.name] = true
-				}
-			}
-			navigate(event)
-		}
-
-		const onSlimChildClick = link => {
-			state.activeTablink = link.name
-			closeSlimPopover()
-		}
-
-		const handleDocumentClick = event => {
-			if (!slimPopover.value) return
-			if (sidebarEl.value && !sidebarEl.value.contains(event.target)) {
-				closeSlimPopover()
-			}
-		}
-
-		const handleDocumentKeydown = event => {
-			if (event.key === 'Escape' && slimPopover.value) {
-				closeSlimPopover()
-			}
-		}
-
-		watch(isSlim, slim => {
-			if (!slim) {
-				closeSlimPopover()
-			}
-		})
 
 		const { currentTheme, toggleTheme } = useTheme()
 
-		// Active downloads tracker for the badge
+		// Active downloads tracker for the Queue badge
 		const queueList = ref({})
 		const queueOrder = ref([])
 		const activeUuids = ref([])
@@ -437,10 +241,6 @@ export default defineComponent({
 		}
 
 		onMounted(async () => {
-			if (typeof document !== 'undefined') {
-				document.addEventListener('click', handleDocumentClick)
-				document.addEventListener('keydown', handleDocumentKeydown)
-			}
 			socket.on('startDownload', handleStartDownload)
 			socket.on('finishDownload', handleFinishDownload)
 			socket.on('addedToQueue', handleAddedToQueue)
@@ -473,10 +273,8 @@ export default defineComponent({
 		})
 
 		onBeforeUnmount(() => {
-			cancelCloseSlimPopover()
-			if (typeof document !== 'undefined') {
-				document.removeEventListener('click', handleDocumentClick)
-				document.removeEventListener('keydown', handleDocumentKeydown)
+			if (typeof removeAfterEach === 'function') {
+				removeAfterEach()
 			}
 			socket.off('startDownload', handleStartDownload)
 			socket.off('finishDownload', handleFinishDownload)
@@ -488,41 +286,14 @@ export default defineComponent({
 			socket.off('queueOrderUpdated', handleQueueOrderUpdated)
 		})
 
-		ctx.root.$router.afterEach(to => {
-			currentRouteName.value = to.name
-			currentRouteQuery.value = { ...(to.query || {}) }
-			closeSlimPopover()
-
-			const linkInSidebar = state.links.find(link => link.routerName === to.name)
-			if (!linkInSidebar) return
-			state.activeTablink = linkInSidebar.name
-
-			if (hasChildren(linkInSidebar)) {
-				state.expandedMenus[linkInSidebar.name] = true
-			}
-		})
-
 		return {
-			...toRefs(state),
-			sidebarEl,
-			slimPopover,
+			sidebarSections,
 			currentTheme,
 			toggleTheme,
-			isSlim,
 			downloadingCount,
 			deemixIcon,
-			hasChildren,
-			isExpanded,
-			toggleSubmenu,
-			getParentRoute,
-			getChildRoute,
-			isSubmenuActive,
-			onParentClick,
-			onNavItemEnter,
-			onNavItemLeave,
-			onSlimChildClick,
-			cancelCloseSlimPopover,
-			scheduleCloseSlimPopover
+			getItemRoute,
+			isItemActive
 		}
 	}
 })
@@ -540,27 +311,16 @@ export default defineComponent({
 	-webkit-backdrop-filter: blur(16px);
 	border-right: 1px solid var(--border-color);
 	user-select: none;
-	transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 	z-index: 30;
 	position: relative;
-}
-
-.sidebar-nav.slim-sidebar {
-	width: 4rem;
-	min-width: 4rem;
 }
 
 /* Brand Header */
 .brand-header {
 	display: flex;
 	align-items: center;
-	padding: 1.25rem 1.25rem 0.85rem 1.25rem;
+	padding: 1.15rem 1.25rem 0.75rem 1.25rem;
 	gap: 0.75rem;
-}
-
-.slim-sidebar .brand-header {
-	padding: 1rem 0;
-	justify-content: center;
 }
 
 .deemix-icon-container {
@@ -571,13 +331,8 @@ export default defineComponent({
 }
 
 .deemix-icon-container::v-deep svg {
-	height: 38px;
-	width: 38px;
-}
-
-.slim-sidebar .deemix-icon-container::v-deep svg {
-	height: 28px;
-	width: 28px;
+	height: 36px;
+	width: 36px;
 }
 
 .brand-text {
@@ -616,8 +371,8 @@ export default defineComponent({
 .nav-links-list {
 	display: flex;
 	flex-direction: column;
-	padding: 0.4rem 0.75rem 0.85rem 0.75rem;
-	gap: 0.25rem;
+	padding: 0.35rem 0.75rem 0.85rem 0.75rem;
+	gap: 0.15rem;
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
@@ -645,20 +400,15 @@ export default defineComponent({
 	background: var(--main-scroll);
 }
 
-.slim-sidebar .nav-links-list {
-	padding: 0.75rem 0.35rem;
-	align-items: center;
-}
-
 .sidebar-section {
 	display: flex;
 	flex-direction: column;
-	gap: 0.2rem;
+	gap: 0.125rem;
 }
 
 .sidebar-section--with-divider {
 	margin-top: 0.45rem;
-	padding-top: 0.65rem;
+	padding-top: 0.6rem;
 	border-top: 1px solid var(--border-color);
 }
 
@@ -674,74 +424,39 @@ export default defineComponent({
 	text-transform: uppercase;
 	letter-spacing: 0.085em;
 	color: var(--secondary-text);
-	opacity: 0.72;
+	opacity: 0.78;
 	line-height: 1;
 	white-space: nowrap;
 	user-select: none;
 }
 
-.nav-group {
+.nav-item {
 	display: flex;
-	flex-direction: column;
+	align-items: center;
 	width: 100%;
-}
-
-.slim-sidebar .nav-group {
-	align-items: center;
-}
-
-.nav-item-row {
-	display: flex;
-	align-items: center;
-	height: 2.5rem;
-	border-radius: 0.75rem;
+	min-width: 0;
+	height: 2.15rem;
+	padding: 0 0.8rem;
+	border-radius: 0.65rem;
 	color: var(--secondary-text);
-	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+	text-decoration: none;
+	font-weight: 500;
+	font-size: 0.84375rem;
+	transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 	position: relative;
 }
 
-.slim-sidebar .nav-item-row {
-	justify-content: center;
-	width: 2.75rem;
-}
-
-.nav-item-row:hover {
+.nav-item:not(.active-link):hover {
 	color: var(--foreground);
 	background-color: var(--border-color);
 }
 
-.nav-item-row.active-link {
+.nav-item.active-link,
+.nav-item.active-link:hover {
 	color: #ffffff;
 	background: var(--primary-gradient);
-	box-shadow: 0 4px 15px rgba(59, 130, 246, 0.35);
+	box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
 	font-weight: 600;
-}
-
-.nav-item {
-	display: flex;
-	align-items: center;
-	flex: 1;
-	min-width: 0;
-	height: 100%;
-	padding: 0 0.85rem;
-	color: inherit;
-	text-decoration: none;
-	font-weight: 500;
-	font-size: 0.875rem;
-}
-
-.nav-item-row.has-children .nav-item {
-	padding-right: 0.35rem;
-}
-
-.nav-item-row.active-link .nav-item {
-	font-weight: 600;
-}
-
-.slim-sidebar .nav-item {
-	justify-content: center;
-	padding: 0 !important;
-	width: 100%;
 }
 
 .nav-icon-wrapper {
@@ -753,248 +468,27 @@ export default defineComponent({
 }
 
 .nav-icon {
-	font-size: 1.35rem;
-	transition: color 0.2s ease, transform 0.2s ease;
+	font-size: 1.2rem;
+	opacity: 0.85;
+	transition: color 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
 }
 
-.nav-item-row:hover .nav-icon {
-	transform: scale(1.08);
+.nav-item:hover .nav-icon,
+.nav-item.active-link .nav-icon {
+	opacity: 1;
+}
+
+.nav-item:hover .nav-icon {
+	transform: scale(1.06);
 }
 
 .nav-label {
-	margin-left: 0.75rem;
+	margin-left: 0.7rem;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	text-transform: capitalize;
 	flex: 1;
-}
-
-/* Submenu Toggle Chevron */
-.submenu-toggle-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 1.85rem;
-	height: 1.85rem;
-	margin-right: 0.35rem;
-	border-radius: 0.5rem;
-	border: none;
-	background: transparent;
-	color: inherit;
-	opacity: 0.75;
-	cursor: pointer;
-	flex-shrink: 0;
-	transition: background-color 0.15s ease, opacity 0.15s ease;
-	outline: none;
-}
-
-.submenu-toggle-btn:hover {
-	opacity: 1;
-	background-color: rgba(255, 255, 255, 0.12);
-}
-
-:root[data-theme='light'] .nav-item-row:not(.active-link) .submenu-toggle-btn:hover {
-	background-color: rgba(15, 23, 42, 0.08);
-}
-
-.submenu-chevron {
-	font-size: 1.15rem;
-	transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.submenu-toggle-btn.is-expanded .submenu-chevron {
-	transform: rotate(180deg);
-}
-
-/* Collapsible Submenu List */
-.submenu-list {
-	display: flex;
-	flex-direction: column;
-	gap: 0.125rem;
-	margin: 0.25rem 0 0.35rem 1.15rem;
-	padding-left: 0.55rem;
-	border-left: 1.5px solid var(--border-color-hover);
-}
-
-.submenu-list--active-parent {
-	border-left-color: rgba(6, 182, 212, 0.35);
-}
-
-.submenu-item {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	height: 1.95rem;
-	padding: 0 0.55rem;
-	border-radius: 0.55rem;
-	color: var(--secondary-text);
-	text-decoration: none;
-	font-size: 0.8125rem;
-	font-weight: 500;
-	border: 1px solid transparent;
-	transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-	position: relative;
-}
-
-.submenu-item:hover {
-	color: var(--foreground);
-	background-color: var(--border-color);
-}
-
-.submenu-item--active {
-	color: var(--accent-cyan) !important;
-	background: rgba(6, 182, 212, 0.12) !important;
-	border-color: rgba(6, 182, 212, 0.28);
-	font-weight: 600;
-}
-
-.submenu-icon {
-	font-size: 1.05rem;
-	opacity: 0.8;
-	flex-shrink: 0;
-	transition: color 0.18s ease, opacity 0.18s ease;
-}
-
-.submenu-item--active .submenu-icon,
-.slim-popover-item--active .submenu-icon {
-	color: var(--accent-cyan);
-	opacity: 1;
-}
-
-.submenu-label {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	flex: 1;
-}
-
-.submenu-active-dot {
-	width: 6px;
-	height: 6px;
-	border-radius: 9999px;
-	background: var(--accent-cyan);
-	box-shadow: 0 0 8px rgba(6, 182, 212, 0.75);
-	flex-shrink: 0;
-}
-
-/* Submenu Collapse Animation */
-.submenu-collapse-enter-active,
-.submenu-collapse-leave-active {
-	transition: max-height 0.24s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease, transform 0.18s ease;
-	overflow: hidden;
-}
-
-.submenu-collapse-enter,
-.submenu-collapse-leave-to {
-	max-height: 0;
-	opacity: 0;
-	transform: translateY(-4px);
-}
-
-.submenu-collapse-enter-to,
-.submenu-collapse-leave {
-	max-height: 460px;
-	opacity: 1;
-	transform: translateY(0);
-}
-
-/* Slim Mode Floating Submenu Popover */
-.slim-submenu-popover {
-	position: fixed;
-	left: 4.4rem;
-	min-width: 14rem;
-	max-width: 16.5rem;
-	padding: 0.5rem;
-	border-radius: 0.875rem;
-	background: rgba(15, 23, 42, 0.94);
-	backdrop-filter: blur(18px);
-	-webkit-backdrop-filter: blur(18px);
-	border: 1px solid rgba(255, 255, 255, 0.12);
-	box-shadow: 0 18px 36px -8px rgba(0, 0, 0, 0.55), 0 0 20px rgba(6, 182, 212, 0.12);
-	z-index: 60;
-}
-
-:root[data-theme='light'] .slim-submenu-popover {
-	background: rgba(255, 255, 255, 0.96);
-	border-color: rgba(15, 23, 42, 0.12);
-	box-shadow: 0 18px 36px -8px rgba(15, 23, 42, 0.2);
-}
-
-/* Invisible hover bridge across the gap between slim rail and popover */
-.slim-submenu-popover::before {
-	content: '';
-	position: absolute;
-	left: -0.75rem;
-	top: 0;
-	bottom: 0;
-	width: 0.75rem;
-}
-
-.slim-popover-header {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	padding: 0.4rem 0.65rem 0.55rem 0.65rem;
-	margin-bottom: 0.35rem;
-	border-bottom: 1px solid var(--border-color);
-}
-
-.slim-popover-header-icon {
-	font-size: 1.05rem;
-	color: var(--accent-cyan);
-}
-
-.slim-popover-title {
-	font-size: 0.75rem;
-	font-weight: 700;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	color: var(--foreground);
-}
-
-.slim-popover-items {
-	display: flex;
-	flex-direction: column;
-	gap: 0.15rem;
-}
-
-.slim-popover-item {
-	display: flex;
-	align-items: center;
-	gap: 0.55rem;
-	height: 2.15rem;
-	padding: 0 0.65rem;
-	border-radius: 0.55rem;
-	color: var(--secondary-text);
-	text-decoration: none;
-	font-size: 0.8125rem;
-	font-weight: 500;
-	border: 1px solid transparent;
-	transition: all 0.15s ease;
-}
-
-.slim-popover-item:hover {
-	color: var(--foreground);
-	background-color: var(--border-color);
-}
-
-.slim-popover-item--active {
-	color: var(--accent-cyan) !important;
-	background: rgba(6, 182, 212, 0.14) !important;
-	border-color: rgba(6, 182, 212, 0.3);
-	font-weight: 600;
-}
-
-.popover-fade-enter-active,
-.popover-fade-leave-active {
-	transition: opacity 0.15s ease, transform 0.15s ease;
-}
-
-.popover-fade-enter,
-.popover-fade-leave-to {
-	opacity: 0;
-	transform: translateX(-6px);
 }
 
 /* Download Badge */
@@ -1010,6 +504,7 @@ export default defineComponent({
 	color: #ffffff;
 	box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
 	margin-left: auto;
+	flex-shrink: 0;
 }
 
 .active-link .download-count-badge {
@@ -1030,18 +525,6 @@ export default defineComponent({
 	background-color: var(--primary-color);
 }
 
-.slim-download-dot {
-	position: absolute;
-	top: -2px;
-	right: -2px;
-	width: 8px;
-	height: 8px;
-	border-radius: 9999px;
-	background-color: #06b6d4;
-	box-shadow: 0 0 8px #06b6d4;
-	animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
 @keyframes pulse {
 	0%,
 	100% {
@@ -1060,17 +543,11 @@ export default defineComponent({
 	border-top: 1px solid var(--border-color);
 }
 
-.slim-sidebar .sidebar-footer {
-	padding: 1rem 0.35rem;
-	display: flex;
-	justify-content: center;
-}
-
 .theme-toggle-btn {
 	display: flex;
 	align-items: center;
 	width: 100%;
-	height: 2.5rem;
+	height: 2.4rem;
 	padding: 0 0.85rem;
 	border-radius: 0.75rem;
 	background: var(--secondary-background);
@@ -1081,12 +558,6 @@ export default defineComponent({
 	cursor: pointer;
 	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 	outline: none;
-}
-
-.slim-sidebar .theme-toggle-btn {
-	width: 2.5rem;
-	padding: 0;
-	justify-content: center;
 }
 
 .theme-toggle-btn:hover {
