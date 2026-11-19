@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.34] - 2026-11-18
+
+### Changed
+- Seamless Plex Library Mode: removed the `Plex | Local` toggle in `Library.vue` so enabling Plex integration moves the Library directly into Plex (keeping local `/downloads` mode when Plex is disabled/unconfigured, and replacing `Switch to Local` with a **Plex Settings** link on errors).
+- Flattened, Always-Expanded Sidebar: re-organized `TheSidebar.vue` and `src/webui/src/data/sidebar.js` into a clean, always-expanded 2-level hierarchy across **Discover**, **Library**, **Downloads**, and **Settings** with zero collapse chevrons.
+
 ## [2026.11.33] - 2026-11-18
 
 ### Changed
