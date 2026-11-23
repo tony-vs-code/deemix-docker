@@ -392,3 +392,42 @@ export interface PlexDeleteResult {
 	success: boolean
 	error?: string
 }
+
+export interface MonitoredConfig {
+	enabled: boolean
+	checkIntervalHours: number
+	autoDownload: boolean
+	bitrate: number
+	includeAlbums: boolean
+	includeEPs: boolean
+	includeSingles: boolean
+}
+
+export interface MissingRelease {
+	id: string
+	title: string
+	link: string
+	cover: string
+	releaseDate: string
+	recordType: string
+	nbTracks: number
+}
+
+export interface MonitoredArtist {
+	id: string
+	name: string
+	picture: string
+	monitored: boolean
+	addedAt: string
+	lastCheckedAt: string | null
+	totalReleases: number
+	ownedCount: number
+	missingCount: number
+	missingReleases: MissingRelease[]
+	lastError?: string | null
+}
+
+export interface MonitoredData {
+	config: MonitoredConfig
+	artists: MonitoredArtist[]
+}

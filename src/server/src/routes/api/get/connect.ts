@@ -23,6 +23,10 @@ const handler: ApiHandler['handler'] = async (req, res) => {
 		}
 	}
 
+	if (dz.logged_in && deemix && !deemix.lastDZ) {
+		deemix.lastDZ = dz
+	}
+
 	const result: any = {
 		update,
 		autologin: !dz.logged_in,

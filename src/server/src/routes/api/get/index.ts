@@ -32,6 +32,7 @@ import plexServers from './plexServers'
 import plexLibrary from './plexLibrary'
 import plexThumb from './plexThumb'
 import plexStream from './plexStream'
+import getMonitored from './getMonitored'
 
 export default [
 	connect,
@@ -67,5 +68,6 @@ export default [
 	plexServers,
 	plexLibrary,
 	plexThumb,
-	plexStream
+	plexStream,
+	getMonitored
 ]
