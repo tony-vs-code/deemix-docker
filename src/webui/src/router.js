@@ -12,6 +12,7 @@ import Settings from '@components/pages/Settings.vue'
 import Tracklist from '@components/pages/Tracklist.vue'
 import Downloads from '@components/pages/Downloads.vue'
 import Library from '@components/pages/Library.vue'
+import Monitored from '@components/pages/Monitored.vue'
 
 import { fetchData } from '@/utils/api'
 import EventBus from '@/utils/EventBus'
@@ -74,6 +75,14 @@ const routes = [
 		path: '/library',
 		name: 'Library',
 		component: Library,
+		meta: {
+			notKeepAlive: true
+		}
+	},
+	{
+		path: '/monitored',
+		name: 'Monitored',
+		component: Monitored,
 		meta: {
 			notKeepAlive: true
 		}

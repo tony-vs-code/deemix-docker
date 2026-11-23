@@ -765,6 +765,18 @@ export async function getOrInitLibrary(downloadLocation: string): Promise<Librar
 	return scanLibrary(downloadLocation)
 }
 
+export async function getLibrary(downloadLocation?: string): Promise<LibraryData> {
+	let resolvedLocation = downloadLocation
+	if (!resolvedLocation) {
+		try {
+			resolvedLocation = deemix.settings.load(configFolder)?.downloadLocation
+		} catch {
+			resolvedLocation = undefined
+		}
+	}
+	return getOrInitLibrary(resolvedLocation || '/downloads')
+}
+
 export async function scanLibrary(downloadLocation: string, force = false): Promise<LibraryData> {
 	const resolvedBase = path.resolve(downloadLocation)
 

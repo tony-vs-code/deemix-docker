@@ -32,6 +32,20 @@
 					<div class="hero-actions">
 						<button
 							type="button"
+							class="btn hero-btn monitor-btn"
+							:class="isMonitored ? 'monitor-btn--active' : 'btn-secondary'"
+							:disabled="isTogglingMonitor"
+							:title="isMonitored ? $t('monitored.artist.unmonitor') : $t('monitored.artist.monitor')"
+							@click.stop="toggleMonitor"
+						>
+							<i class="material-icons btn-icon" :class="{ 'spin-active': isTogglingMonitor }">
+								{{ isTogglingMonitor ? 'sync' : isMonitored ? 'notifications_active' : 'notifications_none' }}
+							</i>
+							<span>{{ isMonitored ? $t('monitored.artist.monitoring') : $t('monitored.artist.monitor') }}</span>
+						</button>
+
+						<button
+							type="button"
 							class="btn btn-primary hero-btn"
 							:title="$t('globals.download_hint')"
 							@click.stop="sendAddToQueue(downloadLink + '/discography')"
@@ -176,10 +190,13 @@
 </template>
 
 <script>
-import { defineComponent, ref, unref, reactive, computed, toRefs } from '@vue/composition-api'
+import { defineComponent, ref, unref, reactive, computed, toRefs, onMounted, onBeforeUnmount } from '@vue/composition-api'
 import { orderBy } from 'lodash-es'
 import { sendAddToQueue } from '@/utils/downloads'
 import { checkNewRelease } from '@/utils/dates'
+import { fetchData, postToServer } from '@/utils/api'
+import { socket } from '@/utils/socket'
+import { toast } from '@/utils/toasts'
 import { formatArtistData, getArtistData } from '@/data/artist'
 import { standardizeData } from '@/data/standardize'
 
@@ -198,6 +215,58 @@ export default defineComponent({
 
 		const artistID = computed(() => ctx.root.$router.currentRoute.params.id)
 		const hasDataLoaded = ref(false)
+		const isMonitored = ref(false)
+		const isTogglingMonitor = ref(false)
+
+		const syncMonitoredStatus = payload => {
+			if (!payload || !Array.isArray(payload.artists)) return
+			const targetId = String(unref(artistID) || '')
+			isMonitored.value = payload.artists.some(a => String(a.id) === targetId && a.monitored !== false)
+		}
+
+		onMounted(async () => {
+			socket.on('monitoredUpdated', syncMonitoredStatus)
+			try {
+				const monitoredData = await fetchData('monitored')
+				syncMonitoredStatus(monitoredData)
+			} catch (err) {
+				console.warn('Failed to load monitored status:', err)
+			}
+		})
+
+		onBeforeUnmount(() => {
+			socket.off('monitoredUpdated', syncMonitoredStatus)
+		})
+
+		const toggleMonitor = async () => {
+			const id = String(unref(artistID) || '').trim()
+			if (!id || isTogglingMonitor.value) return
+			isTogglingMonitor.value = true
+
+			try {
+				if (isMonitored.value) {
+					const res = await postToServer('monitored/remove', { id })
+					if (!res || res.error) throw new Error((res && res.error) || 'Request failed')
+					isMonitored.value = false
+					toast(ctx.root.$t('monitored.toasts.artistRemoved', { name: state.artistName || 'Artist' }), 'notifications_off')
+				} else {
+					const res = await postToServer('monitored/artist', {
+						id,
+						name: state.artistName,
+						picture: state.artistPicture,
+						monitored: true
+					})
+					if (!res || res.error) throw new Error((res && res.error) || 'Request failed')
+					isMonitored.value = true
+					toast(ctx.root.$t('monitored.toasts.artistAdded', { name: state.artistName || 'Artist' }), 'notifications_active')
+				}
+			} catch (err) {
+				console.error('Failed to toggle monitored status:', err)
+				toast(ctx.root.$t('monitored.toasts.artistActionFailed'), 'error')
+			} finally {
+				isTogglingMonitor.value = false
+			}
+		}
 
 		getArtistData(unref(artistID))
 			.then(artistData => {
@@ -240,6 +309,9 @@ export default defineComponent({
 		return {
 			...toRefs(state),
 			hasDataLoaded,
+			isMonitored,
+			isTogglingMonitor,
+			toggleMonitor,
 			downloadLink: computed(() => `https://www.deezer.com/artist/${unref(artistID)}`),
 			heroBackdropStyle: computed(() => ({
 				backgroundImage: state.artistPicture
@@ -431,7 +503,8 @@ export default defineComponent({
 .hero-actions {
 	display: flex;
 	align-items: center;
-	gap: 1rem;
+	gap: 0.75rem;
+	flex-wrap: wrap;
 }
 
 .hero-btn {
@@ -442,6 +515,19 @@ export default defineComponent({
 	padding: 0 1.25rem;
 	border-radius: 0.75rem;
 	font-size: 0.875rem;
+}
+
+.monitor-btn--active {
+	background: rgba(16, 185, 129, 0.16);
+	border: 1px solid rgba(16, 185, 129, 0.45);
+	color: #10b981;
+	box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);
+}
+
+.monitor-btn--active:hover {
+	background: rgba(239, 68, 68, 0.14);
+	border-color: rgba(239, 68, 68, 0.4);
+	color: #f87171;
 }
 
 /* Tabs Navigation Bar */

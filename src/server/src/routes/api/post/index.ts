@@ -21,6 +21,11 @@ import plexTest from './plexTest'
 import plexScan from './plexScan'
 import plexAuthPin from './plexAuthPin'
 import plexDelete from './plexDelete'
+import updateMonitoredConfig from './updateMonitoredConfig'
+import addMonitoredArtist from './addMonitoredArtist'
+import removeMonitoredArtist from './removeMonitoredArtist'
+import checkMonitored from './checkMonitored'
+import downloadMissing from './downloadMissing'
 
 export default [
 	changeAccount,
@@ -45,5 +50,10 @@ export default [
 	plexTest,
 	plexScan,
 	plexAuthPin,
-	plexDelete
+	plexDelete,
+	updateMonitoredConfig,
+	addMonitoredArtist,
+	removeMonitoredArtist,
+	checkMonitored,
+	downloadMissing
 ]

@@ -44,6 +44,17 @@ const libraryLink = {
 	]
 }
 
+const monitoredLink = {
+	name: 'monitored',
+	section: 'library',
+	ariaLabel: 'monitored',
+	routerName: 'Monitored',
+	icon: 'notifications_active',
+	label: 'sidebar.monitored',
+	labelKey: 'sidebar.monitored',
+	to: { name: 'Monitored' }
+}
+
 const downloadsLink = {
 	name: 'downloads',
 	section: 'downloads',
@@ -150,7 +161,7 @@ function buildDirectChildItems(parentLink) {
 	}))
 }
 
-export const links = [...discoverLinks, libraryLink, downloadsLink, settingsLink]
+export const links = [...discoverLinks, libraryLink, monitoredLink, downloadsLink, settingsLink]
 
 export const sidebarSections = [
 	{
@@ -164,7 +175,13 @@ export const sidebarSections = [
 	{
 		id: 'library',
 		label: 'Library',
-		links: buildDirectChildItems(libraryLink)
+		links: [
+			...buildDirectChildItems(libraryLink),
+			{
+				...monitoredLink,
+				to: { name: monitoredLink.routerName }
+			}
+		]
 	},
 	{
 		id: 'downloads',

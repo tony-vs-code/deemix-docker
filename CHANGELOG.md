@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026.11.35] - 2026-11-23
+
+### Added
+- Monitored Artists & Discography Diffing Engine (`monitoringDb.ts`): atomic `/config/monitored.json` persistence, smart release title normalization, Plex + local library comparison, release-type/quality/auto-download config, duplicate queue guards, and background sync scheduler.
+- Monitored API Endpoints: `GET /api/monitored`, `POST /api/monitored/config`, `POST /api/monitored/artist`, `POST /api/monitored/remove`, `POST /api/monitored/check`, and `POST /api/monitored/downloadMissing`.
+- Wanted / Monitored View (`Monitored.vue`): dedicated sidebar entry under **Library**, quick-add artist search, sync controls, missing release cards with 1-click download, and a **Monitor / Monitoring** toggle on `Artist.vue`.
+
 ## [2026.11.34] - 2026-11-18
 
 ### Changed

@@ -6,6 +6,7 @@
     "favorites": "favorites",
     "downloads": "downloads",
     "library": "library",
+    "monitored": "monitored",
     "linkAnalyzer": "link analyzer",
     "settings": "settings",
     "logs": "logs",
@@ -264,6 +265,78 @@
         "serversRefreshed": "Discovered {count} Plex server(s)",
         "serversRefreshFailed": "Failed to load Plex servers: {error}"
       }
+    }
+  },
+  "monitored": {
+    "title": "Monitored Artists",
+    "subtitle": "Track artist discographies and automatically download missing releases",
+    "stats": {
+      "monitoredArtists": "Monitored Artists",
+      "missingReleases": "Missing Releases",
+      "autoSync": "Auto-Sync",
+      "activeEvery": "Active · Every {hours}h",
+      "manualOnly": "Paused (Manual Only)",
+      "autoDlOn": "Auto-Download On",
+      "autoDlOff": "Notify Only"
+    },
+    "controls": {
+      "autoCheck": "Auto-Check",
+      "interval": "Check Interval",
+      "autoDownload": "Auto-Download",
+      "quality": "Quality",
+      "releaseTypes": "Release Types",
+      "albums": "Albums",
+      "eps": "EPs",
+      "singles": "Singles",
+      "checkAllNow": "Check All Now",
+      "checking": "Checking...",
+      "downloadAllMissing": "Download All Missing",
+      "downloadingAll": "Queuing..."
+    },
+    "search": {
+      "placeholder": "Search Deezer artists to monitor...",
+      "searchBtn": "Search",
+      "searching": "Searching...",
+      "monitor": "Monitor",
+      "monitoring": "Monitoring",
+      "noResults": "No Deezer artists found for \"{query}\"",
+      "fans": "{count} fans"
+    },
+    "artist": {
+      "owned": "Owned",
+      "total": "Total",
+      "missing": "Missing",
+      "upToDate": "Up to date",
+      "lastChecked": "Checked {time}",
+      "neverChecked": "Not checked yet",
+      "check": "Check",
+      "checking": "Checking...",
+      "downloadMissing": "Download Missing",
+      "unmonitor": "Unmonitor",
+      "monitor": "Monitor",
+      "monitoring": "Monitoring",
+      "allCaughtUp": "All caught up — no missing releases found.",
+      "notCheckedHint": "Not checked yet — click Check to scan Deezer discography.",
+      "tracksCount": "{n} tracks",
+      "download": "Download",
+      "queued": "Queued",
+      "unknownDate": "Unknown date"
+    },
+    "empty": {
+      "title": "No Monitored Artists Yet",
+      "message": "Search for an artist above or click Monitor on any Deezer Artist page to track missing albums, EPs, and singles."
+    },
+    "toasts": {
+      "configSaved": "Monitoring settings saved",
+      "configFailed": "Failed to save monitoring settings",
+      "artistAdded": "Now monitoring {name}",
+      "artistRemoved": "Stopped monitoring {name}",
+      "artistActionFailed": "Failed to update monitored artist",
+      "checkedAll": "Discography check complete",
+      "checkedArtist": "Checked {name}",
+      "checkFailed": "Failed to check discography",
+      "queuedMissing": "Queued {count} missing release(s)",
+      "queueFailed": "Failed to queue missing releases"
     }
   }
 }

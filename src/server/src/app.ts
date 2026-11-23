@@ -11,6 +11,7 @@ import { GUI_PACKAGE } from './helpers/paths'
 import { logger } from './helpers/logger'
 import { scanLibrary } from './helpers/libraryDb'
 import { schedulePlexScan } from './helpers/plex'
+import { startMonitoringScheduler } from './helpers/monitoringDb'
 
 // Types
 const Downloader = deemix.downloader.Downloader
@@ -78,6 +79,7 @@ export class DeemixApp {
 		this.plugins.spotify.setup()
 		this.restoreQueueFromDisk()
 		this.checkPermissions()
+		startMonitoringScheduler(this)
 	}
 
 	get currentJob(): any {
